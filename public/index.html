@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es" data-theme="base">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>RegaláFácil PY</title>
+  <meta name="description" content="Regalos y novedades en Paraguay. Encontrá el regalo ideal y pedilo por WhatsApp.">
+  <meta property="og:title" content="RegaláFácil PY">
+  <meta property="og:description" content="Regalos y novedades en Paraguay. Encontrá el regalo ideal y pedilo por WhatsApp.">
+  <meta name="theme-color" content="#e11d48">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <span class="dot" aria-hidden="true"></span>
+      <span>Atención directa por WhatsApp</span>
+      <span class="top-phone" id="topPhone"></span>
+    </div>
+  </div>
+
+  <header>
+    <div class="header-inner">
+      <div class="brand-row">
+        <div class="brand-left">
+          <div class="brand-logo" aria-hidden="true">🎁</div>
+          <div>
+            <h1 id="biz">RegaláFácil <span class="brand-accent">PY</span></h1>
+            <p class="brand-sub">Regalos y novedades · Pedí fácil por WhatsApp</p>
+          </div>
+        </div>
+        <button class="reset-top" data-act="resetAll" type="button">Ver todo</button>
+      </div>
+
+      <div class="search-wrap">
+        <input id="q" type="search" placeholder="Buscar termo, maleta, hogar, accesorios…" autocomplete="off">
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="guide-box" aria-label="Ayuda para elegir regalo">
+      <div class="guide-head">
+        <span class="guide-tag">GUÍA RÁPIDA</span>
+        <h2>¿Tenés que hacer un regalo y no sabés qué elegir?</h2>
+        <p>Elegí quién lo recibe, la ocasión o tu presupuesto y te filtramos opciones reales del catálogo.</p>
+      </div>
+      <button class="guide-btn" data-act="gift" type="button">
+        <span>🎁 Abrir ayuda de regalos</span>
+        <span aria-hidden="true">›</span>
+      </button>
+    </section>
+
+    <section class="filter-block" aria-label="Presupuesto">
+      <div class="filter-label-row">
+        <span>PRESUPUESTO</span>
+        <span class="filter-active-val" id="budgetLabel">Todos</span>
+      </div>
+      <div class="chips" id="budgetChips"></div>
+    </section>
+
+    <section class="filter-block" aria-label="Categorías">
+      <div class="chips" id="cats"></div>
+    </section>
+
+    <div id="banner"></div>
+
+    <div class="section-meta">
+      <h2 id="listTitle">Opciones para vos</h2>
+      <span id="listCount"></span>
+    </div>
+
+    <div id="grid" class="grid">
+      <p class="empty">Cargando catálogo…</p>
+    </div>
+  </main>
+
+  <div id="bar" class="bar" hidden>
+    <button data-act="cart" type="button"></button>
+  </div>
+
+  <dialog id="dlg"></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
