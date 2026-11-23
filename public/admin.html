@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin — RegaláFácil PY</title>
+  <link rel="stylesheet" href="/admin.css" />
+  <style>.bottom-nav{grid-template-columns:repeat(3,1fr)}.settings-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px}.settings-card h3{margin:0 0 8px;font-size:1rem}</style>
+</head>
+<body>
+  <!-- Pantalla de acceso -->
+  <section id="loginView" class="login-wrap">
+    <div class="login-card">
+      <div class="brand-badge">RegaláFácil PY</div>
+      <h1>Panel de Administración</h1>
+      <p class="muted">Ingresá tu contraseña para gestionar productos, ofertas y pedidos.</p>
+      <form id="loginForm" class="stack">
+        <label class="field">
+          <span>Contraseña</span>
+          <input type="password" id="loginPassword" name="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="btn btn-primary" id="loginBtn">Entrar</button>
+        <p id="loginError" class="error-text" hidden></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- Panel principal -->
+  <div id="adminApp" class="admin-shell" hidden>
+    <header class="topbar">
+      <div>
+        <strong>RegaláFácil PY</strong>
+        <span class="badge-env">Admin</span>
+      </div>
+      <div class="topbar-actions">
+        <a href="/" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Ver catálogo</a>
+        <button type="button" id="logoutBtn" class="btn btn-ghost btn-sm">Salir</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section id="tab-products" class="tab-panel active">
+        <div class="panel-head">
+          <h2>Productos</h2>
+          <button type="button" id="newProductBtn" class="btn btn-primary btn-sm">+ Nuevo producto</button>
+        </div>
+        <div id="productsList" class="cards-list"></div>
+      </section>
+
+      <section id="tab-leads" class="tab-panel">
+        <div class="panel-head">
+          <h2>Pedidos / Consultas</h2>
+        </div>
+        <div id="leadsList" class="cards-list"></div>
+      </section>
+
+      <section id="tab-sellers" class="tab-panel">
+        <div class="panel-head">
+          <h2>Vendedores</h2>
+          <button type="button" id="newSellerBtn" class="btn btn-primary btn-sm">+ Nuevo vendedor</button>
+        </div>
+        <form id="bizForm" class="settings-card stack">
+          <h3>Datos del negocio</h3>
+          <label class="field"><span>Nombre del negocio</span><input type="text" id="bizName" required /></label>
+          <label class="field"><span>WhatsApp del administrador (recibe los pedidos sin link de vendedor)</span><input type="tel" id="bizPhone" required placeholder="0981 123 456" /></label>
+          <button type="submit" class="btn btn-ghost btn-sm">Guardar datos</button>
+          <p id="bizMsg" class="error-text" hidden></p>
+        </form>
+        <div id="sellersList" class="cards-list"></div>
+      </section>
+    </main>
+
+    <!-- Navegación inferior móvil -->
+    <nav class="bottom-nav" aria-label="Secciones del panel">
+      <button type="button" class="nav-item active" data-tab="products">
+        <span>Productos</span>
+      </button>
+      <button type="button" class="nav-item" data-tab="leads">
+        <span>Pedidos</span>
+      </button>
+      <button type="button" class="nav-item" data-tab="sellers">
+        <span>Vendedores</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Hoja para crear o editar producto -->
+  <dialog id="productModal" class="sheet">
+    <form id="productForm" method="dialog" class="stack">
+      <div class="sheet-head">
+        <h3 id="productModalTitle">Nuevo producto</h3>
+        <button type="button" id="closeModalBtn" class="icon-btn" aria-label="Cerrar">✕</button>
+      </div>
+
+      <input type="hidden" id="prodId" />
+
+      <label class="field">
+        <span>Nombre del regalo *</span>
+        <input type="text" id="prodName" required placeholder="Ej: Box Matero Premium" />
+      </label>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Precio normal (Gs.) *</span>
+          <input type="number" id="prodPrice" min="1" step="1" required placeholder="150000" />
+        </label>
+        <label class="field">
+          <span>Precio oferta (Gs.)</span>
+          <input type="number" id="prodOfferPrice" min="0" step="1" placeholder="Opcional" />
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Oferta válida hasta</span>
+        <input type="datetime-local" id="prodOfferEnds" />
+        <small class="muted">Obligatoria si cargás un precio de oferta. Al llegar esa fecha el precio vuelve al normal solo.</small>
+      </label>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Categoría</span>
+          <select id="prodCategory"></select>
+        </label>
+        <label class="field">
+          <span>Estado</span>
+          <select id="prodStatus">
+            <option value="active">Activo</option>
+            <option value="paused">Pausado</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Descripción</span>
+        <textarea id="prodDesc" rows="3" placeholder="Detalles, qué incluye, presentación..."></textarea>
+      </label>
+
+      <div class="field">
+        <span>Etiquetas (para quién / ocasión / edad)</span>
+        <div id="prodTags" class="chips-wrap"></div>
+      </div>
+
+      <div class="field">
+        <span>Foto del producto (se comprime automáticamente)</span>
+        <input type="file" id="prodImageFile" accept="image/*" />
+        <div id="prodImagePreview" class="img-preview"></div>
+      </div>
+
+      <p id="productFormError" class="error-text" hidden></p>
+
+      <div class="sheet-actions">
+        <button type="button" id="deleteProductBtn" class="btn btn-danger" hidden>Eliminar</button>
+        <button type="submit" class="btn btn-primary" id="saveProductBtn">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="sellerModal" class="sheet">
+    <form id="sellerForm" method="dialog" class="stack">
+      <div class="sheet-head">
+        <h3 id="sellerTitle">Nuevo vendedor</h3>
+        <button type="button" id="closeSellerBtn" class="icon-btn" aria-label="Cerrar">✕</button>
+      </div>
+      <input type="hidden" id="sId" />
+      <label class="field"><span>Nombre *</span><input type="text" id="sName" required /></label>
+      <label class="field"><span>Ciudad</span><input type="text" id="sCity" placeholder="Ej: Asunción" /></label>
+      <label class="field"><span>WhatsApp con el que trabaja *</span><input type="tel" id="sPhone" required placeholder="0981 123 456" /></label>
+      <label class="field"><span>Estado</span><select id="sActive"><option value="1">Activo</option><option value="0">Inactivo</option></select></label>
+      <p class="muted">Su link no cambia nunca, aunque cambies el número.</p>
+      <p id="sellerError" class="error-text" hidden></p>
+      <div class="sheet-actions"><button type="submit" class="btn btn-primary" id="saveSellerBtn">Guardar</button></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/admin.js"></script>
+  <script type="module" src="/admin-sellers.js"></script>
+</body>
+</html>

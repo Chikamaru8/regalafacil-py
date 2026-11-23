@@ -1,40 +1,41 @@
-export async function onRequestGet({ request, env }) {
-  const url = new URL(request.url);
-  const sellerSlug = url.searchParams.get('v');
+const TTL = 60; // segundos: los cambios del admin tardan hasta ~1-2 min en verse en la tienda
+
+export async function onRequestGet({ request, env, waitUntil }) {
+  const cache = caches.default;
+  const hit = await cache.match(request);
+  if (hit) return hit;
+
+  const slug = (new URL(request.url).searchParams.get('v') || '').slice(0, 60);
   const now = Math.floor(Date.now() / 1000);
 
-  const { results: settingsRows } = await env.DB.prepare('SELECT key, value FROM settings').all();
+  // Una sola ida a la base. Sin link de vendedor válido, seller = null (la tienda usa el número del administrador).
+  const [st, sel, cat, tag, prod] = await env.DB.batch([
+    env.DB.prepare('SELECT key, value FROM settings'),
+    env.DB.prepare('SELECT id, slug, name, phone FROM seller WHERE slug = ? AND active = 1').bind(slug),
+    env.DB.prepare('SELECT id, slug, name FROM category WHERE active = 1 ORDER BY sort_order, id'),
+    env.DB.prepare('SELECT id, group_key, slug, label FROM tag ORDER BY id'),
+    env.DB.prepare(`
+      SELECT p.id, p.slug, p.name, p.description, p.price_gs, p.category_id, p.attributes,
+        (SELECT MIN(o.offer_price_gs) FROM offer o WHERE o.product_id = p.id AND ?1 BETWEEN o.starts_at AND o.ends_at) AS offer_price_gs,
+        (SELECT o.ends_at FROM offer o WHERE o.product_id = p.id AND ?1 BETWEEN o.starts_at AND o.ends_at ORDER BY o.offer_price_gs LIMIT 1) AS offer_ends_at,
+        (SELECT GROUP_CONCAT(id) FROM (SELECT id FROM product_image WHERE product_id = p.id ORDER BY sort_order, id)) AS image_ids,
+        (SELECT GROUP_CONCAT(tag_id) FROM product_tag WHERE product_id = p.id) AS tag_ids
+      FROM product p WHERE p.status = 'active' ORDER BY p.id DESC`).bind(now)
+  ]);
+
   const settings = {};
-  for (const row of settingsRows) {
-    try { settings[row.key] = JSON.parse(row.value); } catch { settings[row.key] = row.value; }
-  }
+  for (const r of st.results) { try { settings[r.key] = JSON.parse(r.value); } catch { settings[r.key] = r.value; } }
+  const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
+  const nums = (s) => (s ? s.split(',').map(Number) : []);
 
-  let seller = null;
-  if (sellerSlug) {
-    seller = await env.DB.prepare('SELECT id, slug, name, phone FROM seller WHERE slug = ? AND active = 1').bind(sellerSlug).first();
-  }
-  if (!seller) {
-    seller = await env.DB.prepare('SELECT id, slug, name, phone FROM seller WHERE active = 1 ORDER BY id ASC LIMIT 1').first();
-  }
-
-  const { results: categories } = await env.DB.prepare('SELECT id, slug, name FROM category WHERE active = 1 ORDER BY sort_order ASC, id ASC').all();
-  const { results: tags } = await env.DB.prepare('SELECT id, group_key, slug, label FROM tag ORDER BY id ASC').all();
-
-  const { results: products } = await env.DB.prepare(`
-    SELECT p.id, p.slug, p.name, p.description, p.price_gs, p.category_id, p.attributes,
-      (SELECT MIN(o.offer_price_gs) FROM offer o WHERE o.product_id = p.id AND ? BETWEEN o.starts_at AND o.ends_at) AS offer_price_gs,
-      (SELECT o.ends_at FROM offer o WHERE o.product_id = p.id AND ? BETWEEN o.starts_at AND o.ends_at ORDER BY o.offer_price_gs ASC LIMIT 1) AS offer_ends_at,
-      (SELECT GROUP_CONCAT(pi.id) FROM product_image pi WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC) AS image_ids,
-      (SELECT GROUP_CONCAT(pt.tag_id) FROM product_tag pt WHERE pt.product_id = p.id) AS tag_ids
-    FROM product p WHERE p.status = 'active' ORDER BY p.id DESC
-  `).bind(now, now).all();
-
-  const formattedProducts = products.map((p) => ({
-    ...p,
-    attributes: JSON.parse(p.attributes || '{}'),
-    image_ids: p.image_ids ? p.image_ids.split(',').map(Number) : [],
-    tag_ids: p.tag_ids ? p.tag_ids.split(',').map(Number) : []
-  }));
-
-  return Response.json({ settings, seller, categories, tags, products: formattedProducts });
+  const body = JSON.stringify({
+    settings,
+    seller: sel.results[0] || null,
+    categories: cat.results,
+    tags: tag.results,
+    products: prod.results.map((p) => ({ ...p, attributes: parse(p.attributes), image_ids: nums(p.image_ids), tag_ids: nums(p.tag_ids) }))
+  });
+  const res = new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${TTL}` } });
+  waitUntil(cache.put(request, res.clone()));
+  return res;
 }

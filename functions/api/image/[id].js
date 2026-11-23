@@ -8,6 +8,8 @@ export async function onRequestGet({ params, env }) {
   return new Response(new Uint8Array(row.data), {
     headers: {
       'Content-Type': row.mime || 'image/webp',
+      'X-Content-Type-Options': 'nosniff',
+      // Cada foto nueva tiene un id nuevo, por eso es seguro cachearla por mucho tiempo.
       'Cache-Control': 'public, max-age=31536000, immutable'
     }
   });

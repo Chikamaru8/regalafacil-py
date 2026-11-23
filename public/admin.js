@@ -1,0 +1,393 @@
+const state = { data: null, selectedFile: null, editingProduct: null };
+
+const $ = (sel) => document.querySelector(sel);
+const fmtGs = (n) => new Intl.NumberFormat('es-PY').format(Number(n || 0)) + ' Gs.';
+const nowSec = () => Math.floor(Date.now() / 1000);
+const fmtDate = (ts) =>
+  new Date(ts * 1000).toLocaleString('es-PY', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const toLocalInput = (ts) => {
+  const d = new Date(ts * 1000);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};
+const offerActive = (p) => Number(p.offer_price_gs) > 0 && Number(p.offer_ends_at) > nowSec();
+const offerExpired = (p) => Number(p.offer_price_gs) > 0 && Number(p.offer_ends_at) <= nowSec();
+
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function waLink(phone) {
+  let d = String(phone || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('0')) d = '595' + d.slice(1);
+  return `https://wa.me/${d}`;
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    credentials: 'same-origin',
+    headers: opts.body instanceof FormData ? {} : { 'Content-Type': 'application/json' },
+    ...opts
+  });
+  const text = await res.text();
+  let json = {};
+  try { json = text ? JSON.parse(text) : {}; } catch { json = { error: text }; }
+  if (!res.ok) {
+    if (res.status === 401 && state.data) {
+      state.data = null;
+      showLogin('Tu sesión venció. Ingresá de nuevo.');
+    }
+    const err = new Error(json.error || `Error HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return json;
+}
+
+function showLogin(msg = '') {
+  $('#adminApp').hidden = true;
+  $('#loginView').hidden = false;
+  $('#loginError').textContent = msg;
+  $('#loginError').hidden = !msg;
+}
+
+async function showApp() {
+  await refreshBootstrap();
+  $('#loginView').hidden = true;
+  $('#adminApp').hidden = false;
+}
+
+async function refreshBootstrap() {
+  state.data = await api('/api/admin/bootstrap');
+  renderProducts();
+  renderLeads();
+  populateFormOptions();
+}
+
+/* ---------- Productos ---------- */
+function renderProducts() {
+  const list = $('#productsList');
+  const products = state.data?.products || [];
+  if (!products.length) {
+    list.innerHTML = '<p class="muted">Todavía no hay productos cargados.</p>';
+    return;
+  }
+
+  list.innerHTML = products.map((p) => {
+    const imgSrc = p.image_ids?.[0] ? `/api/image/${p.image_ids[0]}` : '';
+    const active = offerActive(p);
+    const isActive = p.status === 'active';
+    return `
+      <article class="card">
+        ${imgSrc
+          ? `<img src="${imgSrc}" alt="${escapeHtml(p.name)}" class="card-thumb" loading="lazy" />`
+          : `<div class="card-thumb"></div>`}
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <h3 class="card-title">${escapeHtml(p.name)}</h3>
+            <span class="pill ${isActive ? 'pill-ok' : 'pill-warn'}">${isActive ? 'Activo' : 'Pausado'}</span>
+            ${offerExpired(p) ? '<span class="pill pill-warn">Oferta vencida</span>' : ''}
+          </div>
+          <div class="price-row">
+            ${active
+              ? `<span class="price-offer">${fmtGs(p.offer_price_gs)}</span>
+                 <span class="price-strike">${fmtGs(p.price_gs)}</span>`
+              : `<span class="price-main">${fmtGs(p.price_gs)}</span>`}
+          </div>
+          ${active ? `<p class="muted" style="margin:2px 0 0;">Oferta hasta ${fmtDate(p.offer_ends_at)}</p>` : ''}
+          ${p.description ? `<p class="muted" style="margin:4px 0 0;">${escapeHtml(p.description)}</p>` : ''}
+        </div>
+        <div class="card-actions">
+          <button type="button" class="btn btn-ghost btn-sm" data-edit-id="${p.id}">Editar</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-edit-id]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const prod = state.data.products.find((x) => x.id === Number(btn.dataset.editId));
+      if (prod) openProductModal(prod);
+    });
+  });
+}
+
+/* ---------- Pedidos ---------- */
+// Deben coincidir con los estados que acepta la base de datos
+const LEAD_LABELS = { new: 'Nuevo', chatting: 'Conversando', sold: 'Vendido', lost: 'Perdido' };
+
+function renderLeads() {
+  const list = $('#leadsList');
+  const leads = state.data?.leads || [];
+  if (!leads.length) {
+    list.innerHTML = '<p class="muted">No hay pedidos registrados todavía.</p>';
+    return;
+  }
+
+  list.innerHTML = leads.map((l) => {
+    const itemsText = (l.items || [])
+      .map((it) => `${it.qty}x ${it.product_name} (${fmtGs(it.unit_price_gs)})`)
+      .join(' · ');
+    const wa = waLink(l.customer_phone);
+
+    return `
+      <article class="card">
+        <div class="card-body">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <strong>Ref ${escapeHtml(l.ref || ('#' + l.id))}</strong>
+            <select data-lead-status="${l.id}" style="padding:5px 8px;border-radius:8px;border:1px solid #d0d5dd;">
+              ${Object.entries(LEAD_LABELS).map(([val, label]) =>
+                `<option value="${val}" ${l.status === val ? 'selected' : ''}>${label}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <p class="muted" style="margin:4px 0 2px;">${l.created_at ? new Date(l.created_at * 1000).toLocaleString('es-PY') : ''}</p>
+          <p style="margin:6px 0 2px;"><strong>${escapeHtml(l.customer_name || 'Cliente')}</strong>${l.customer_phone ? ' · ' + escapeHtml(l.customer_phone) : ''}</p>
+          ${l.seller_name ? `<p class="muted" style="margin:0 0 4px;">Vendedor: ${escapeHtml(l.seller_name)}</p>` : ''}
+          ${itemsText ? `<p class="muted" style="margin:0 0 4px;">${escapeHtml(itemsText)}</p>` : ''}
+          ${l.note ? `<p class="muted" style="margin:0;">Nota: ${escapeHtml(l.note)}</p>` : ''}
+          ${wa ? `<p style="margin:8px 0 0;"><a class="btn btn-ghost btn-sm" href="${wa}" target="_blank" rel="noopener">Escribir por WhatsApp</a></p>` : ''}
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-lead-status]').forEach((sel) => {
+    sel.addEventListener('change', async () => {
+      try {
+        await api('/api/admin/leads', {
+          method: 'PUT',
+          body: JSON.stringify({ id: Number(sel.dataset.leadStatus), status: sel.value })
+        });
+      } catch (err) {
+        alert(err.message);
+        await refreshBootstrap();
+      }
+    });
+  });
+}
+
+/* ---------- Formulario de producto ---------- */
+function populateFormOptions() {
+  const cats = state.data?.categories || [];
+  $('#prodCategory').innerHTML = `<option value="">Sin categoría</option>` +
+    cats.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+
+  const tags = state.data?.tags || [];
+  $('#prodTags').innerHTML = tags.map((t) => `
+    <label class="chip-check">
+      <input type="checkbox" value="${t.id}" />
+      <span>${escapeHtml(t.label)}</span>
+    </label>
+  `).join('');
+}
+
+function openProductModal(prod = null) {
+  state.editingProduct = prod;
+  state.selectedFile = null;
+  $('#prodImageFile').value = '';
+  $('#productFormError').hidden = true;
+
+  if (prod) {
+    $('#productModalTitle').textContent = 'Editar producto';
+    $('#prodId').value = prod.id;
+    $('#prodName').value = prod.name || '';
+    $('#prodPrice').value = prod.price_gs || '';
+    // Una oferta vencida no se vuelve a cargar: guardar el producto la limpia.
+    $('#prodOfferPrice').value = offerActive(prod) ? prod.offer_price_gs : '';
+    $('#prodOfferEnds').value = offerActive(prod) ? toLocalInput(prod.offer_ends_at) : '';
+    $('#prodCategory').value = prod.category_id || '';
+    $('#prodStatus').value = prod.status || 'active';
+    $('#prodDesc').value = prod.description || '';
+    $('#deleteProductBtn').hidden = false;
+
+    const selectedTags = new Set(prod.tag_ids || []);
+    $('#prodTags').querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.checked = selectedTags.has(Number(cb.value));
+    });
+
+    $('#prodImagePreview').innerHTML = prod.image_ids?.[0]
+      ? `<img src="/api/image/${prod.image_ids[0]}" alt="Vista previa" />`
+      : '';
+  } else {
+    $('#productModalTitle').textContent = 'Nuevo producto';
+    $('#productForm').reset();
+    $('#prodId').value = '';
+    $('#prodStatus').value = 'active';
+    $('#deleteProductBtn').hidden = true;
+    $('#prodImagePreview').innerHTML = '';
+  }
+
+  $('#productModal').showModal();
+}
+
+// Reduce la foto en el celular: WebP si el navegador puede, si no JPEG.
+async function compressImageFile(file) {
+  const bitmap = await createImageBitmap(file);
+  const encode = (canvas, type, q) => new Promise((res) => canvas.toBlob((b) => res(b), type, q));
+  let best = null;
+
+  for (const side of [1100, 900, 720]) {
+    const ratio = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
+    canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    for (const q of [0.82, 0.7, 0.55]) {
+      let blob = await encode(canvas, 'image/webp', q);
+      if (!blob || blob.type !== 'image/webp') blob = await encode(canvas, 'image/jpeg', q);
+      if (!blob) continue;
+      best = blob;
+      if (blob.size <= 800 * 1024) { bitmap.close?.(); return blob; }
+    }
+  }
+  bitmap.close?.();
+  if (!best) throw new Error('No se pudo procesar la imagen.');
+  return best;
+}
+
+/* ---------- Eventos ---------- */
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#loginError').hidden = true;
+  $('#loginBtn').disabled = true;
+  try {
+    await api('/api/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ password: $('#loginPassword').value })
+    });
+    $('#loginPassword').value = '';
+    await showApp();
+  } catch (err) {
+    $('#loginError').textContent = err.message;
+    $('#loginError').hidden = false;
+  } finally {
+    $('#loginBtn').disabled = false;
+  }
+});
+
+$('#logoutBtn').addEventListener('click', async () => {
+  try { await api('/api/admin/logout', { method: 'POST' }); } catch {}
+  state.data = null;
+  showLogin();
+});
+
+$('#newProductBtn').addEventListener('click', () => openProductModal(null));
+$('#closeModalBtn').addEventListener('click', () => $('#productModal').close());
+
+$('#prodImageFile').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) { state.selectedFile = null; return; }
+  try {
+    const compressed = await compressImageFile(file);
+    state.selectedFile = compressed;
+    $('#prodImagePreview').innerHTML = `<img src="${URL.createObjectURL(compressed)}" alt="Vista previa" />`;
+    $('#productFormError').hidden = true;
+  } catch (err) {
+    state.selectedFile = null;
+    $('#prodImageFile').value = '';
+    $('#productFormError').textContent = err.message || 'No se pudo leer la foto. Probá con otra.';
+    $('#productFormError').hidden = false;
+  }
+});
+
+$('#productForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#productFormError').hidden = true;
+  $('#saveProductBtn').disabled = true;
+
+  try {
+    const idVal = Number($('#prodId').value);
+    const price = Number($('#prodPrice').value);
+    const offerPrice = Number($('#prodOfferPrice').value) || 0;
+    let offerEnds = null;
+
+    if (offerPrice > 0) {
+      if (offerPrice >= price) throw new Error('El precio de oferta debe ser menor al precio normal.');
+      const endsVal = $('#prodOfferEnds').value;
+      if (!endsVal) throw new Error('Indicá hasta cuándo vale la oferta.');
+      offerEnds = Math.floor(new Date(endsVal).getTime() / 1000);
+      if (!(offerEnds > nowSec())) throw new Error('La fecha de fin de la oferta debe ser futura.');
+    }
+
+    const tagIds = Array.from($('#prodTags').querySelectorAll('input[type="checkbox"]:checked'))
+      .map((cb) => Number(cb.value));
+
+    const payload = {
+      ...(idVal ? { id: idVal } : {}),
+      name: $('#prodName').value.trim(),
+      price_gs: price,
+      offer_price_gs: offerPrice,
+      offer_ends_at: offerEnds,
+      category_id: $('#prodCategory').value ? Number($('#prodCategory').value) : null,
+      status: $('#prodStatus').value,
+      description: $('#prodDesc').value.trim(),
+      tag_ids: tagIds
+    };
+
+    const saved = await api('/api/admin/products', {
+      method: idVal ? 'PUT' : 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    const targetId = idVal || saved.id;
+    // Si la foto falla, el reintento actualiza este mismo producto en vez de duplicarlo.
+    if (!idVal) { $('#prodId').value = String(saved.id); $('#deleteProductBtn').hidden = false; }
+
+    if (state.selectedFile && targetId) {
+      const fd = new FormData();
+      fd.append('product_id', String(targetId));
+      fd.append('file', state.selectedFile, 'photo');
+      try {
+        await api('/api/admin/image', { method: 'POST', body: fd });
+      } catch (imgErr) {
+        await refreshBootstrap();
+        throw new Error(`El producto se guardó, pero la foto no se pudo subir: ${imgErr.message}. Volvé a presionar Guardar para reintentar.`);
+      }
+    }
+
+    $('#productModal').close();
+    await refreshBootstrap();
+  } catch (err) {
+    $('#productFormError').textContent = err.message;
+    $('#productFormError').hidden = false;
+  } finally {
+    $('#saveProductBtn').disabled = false;
+  }
+});
+
+$('#deleteProductBtn').addEventListener('click', async () => {
+  const idVal = Number($('#prodId').value);
+  if (!idVal) return;
+  if (!confirm('¿Eliminar este producto del catálogo?')) return;
+
+  try {
+    await api(`/api/admin/products?id=${idVal}`, { method: 'DELETE' });
+    $('#productModal').close();
+    await refreshBootstrap();
+  } catch (err) {
+    $('#productFormError').textContent = err.message;
+    $('#productFormError').hidden = false;
+  }
+});
+
+document.querySelectorAll('.nav-item').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.nav-item').forEach((b) => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.id === `tab-${tab}`));
+  });
+});
+
+// Arranque: si ya hay sesión válida entra directo; si no, muestra el login
+(async function init() {
+  try {
+    await showApp();
+  } catch (err) {
+    showLogin(err.status === 401 ? '' : 'No se pudo conectar con el servidor. Revisá tu conexión.');
+  }
+})();
