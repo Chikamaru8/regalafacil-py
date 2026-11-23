@@ -480,7 +480,7 @@
 
     function getEffectivePrice(p) {
       const now = Math.floor(Date.now() / 1000);
-      if (p.offer_price_gs != null && (!p.offer_ends_at || p.offer_ends_at > now())) {
+      if (p.offer_price_gs != null && (!p.offer_ends_at || p.offer_ends_at > now)) {
         return Number(p.offer_price_gs);
       }
       return Number(p.price_gs || 0);

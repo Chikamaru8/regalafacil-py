@@ -1,0 +1,8 @@
+name = "catalogo"
+compatibility_date = "2026-11-01"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "catalogo-db"
+database_id = "59050b05-46cf-47b4-930d-372b65d51d5e"
