@@ -330,20 +330,20 @@ function renderMainPreview() {
   if (state.selectedFile) {
     mainPreviewUrl = URL.createObjectURL(state.selectedFile);
     src = mainPreviewUrl;
-    note = 'Foto nueva: se sube al guardar y pasa a ser la #1.';
+    note = 'Foto nueva pendiente de guardar.';
   } else if (productImagesList[0]) {
     src = imgUrl(productImagesList[0].id);
   }
 
   if (!src) {
-    box.innerHTML = '<p class="muted" style="font-size:12px;">Sin foto principal.</p>';
+    box.innerHTML = '<p class="muted" style="font-size:12px;">Sin foto principal seleccionada.</p>';
     return;
   }
 
   box.innerHTML = `
-    <div style="position:relative; display:inline-block;">
-      <img src="${src}" alt="Vista previa" />
-      <button type="button" id="removeMainPhotoBtn" aria-label="Quitar foto principal" style="position:absolute; top:6px; right:6px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:24px; height:24px; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.25);">✕</button>
+    <div style="position:relative; display:inline-block; border:1px solid #cbd5e1; border-radius:8px; padding:4px; background:#fff;">
+      <img src="${src}" alt="Foto principal" style="width:90px; height:90px; object-fit:cover; border-radius:6px; display:block;" />
+      <button type="button" id="removeMainPhotoBtn" aria-label="Quitar foto principal" style="position:absolute; top:2px; right:2px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.25);">✕</button>
     </div>
     ${note ? `<small class="muted" style="display:block; margin-top:4px;">${note}</small>` : ''}
   `;
@@ -361,34 +361,36 @@ async function removeMainPhoto() {
   const first = productImagesList[0];
   if (!first) return;
 
-  const msg = productImagesList.length > 1
-    ? '¿Eliminar la foto principal? La foto #2 pasará a ser la principal.'
-    : '¿Eliminar la foto principal? El producto quedará sin fotos.';
-  if (!confirm(msg)) return;
-
+  if (!confirm('¿Eliminar la foto principal del producto?')) return;
   await deleteImageById(first.id);
 }
 
-/* --- Galeria de fotos --- */
+/* --- Galería de fotos adicionales (Muestra desde la segunda imagen en adelante) --- */
 function renderProductImagesGallery(images = productImagesList) {
   productImagesList = images;
   const container = $('#productImagesGallery');
 
   if (container) {
-    if (!images.length) {
-      container.innerHTML = '<p class="muted" style="font-size:12px;">No hay fotos cargadas todavía.</p>';
+    // Tomamos desde el índice 1 en adelante para que la principal (índice 0) no se repita aquí
+    const galleryImages = images.slice(1);
+
+    if (!galleryImages.length) {
+      container.innerHTML = '<p class="muted" style="font-size:12px;">No hay fotos adicionales en la galería.</p>';
     } else {
       container.innerHTML = `
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;" id="dragGalleryContainer">
-          ${images.map((img, index) => `
-            <div draggable="true" data-index="${index}" class="draggable-thumb" style="position:relative; width:85px; height:95px; border:${index === 0 ? '2px solid #16a34a' : '1px solid #cbd5e1'}; border-radius:8px; overflow:hidden; background:#f8fafc; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
-              <button type="button" onclick="deleteProductImage(${img.id})" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
-              <img src="${imgUrl(img.id)}" alt="" style="width:100%; height:65px; object-fit:cover; border-radius:4px; pointer-events:none;" />
-              <span style="font-size:11px; color:#475569; font-weight:600;">${index === 0 ? '#1 · Principal' : '#' + (index + 1)}</span>
-            </div>
-          `).join('')}
+          ${galleryImages.map((img, idx) => {
+            const actualIndex = idx + 1; // Índice real en el array completo
+            return `
+              <div draggable="true" data-index="${actualIndex}" class="draggable-thumb" style="position:relative; width:85px; height:95px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#f8fafc; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
+                <button type="button" onclick="deleteProductImage(${img.id})" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
+                <img src="${imgUrl(img.id)}" alt="" style="width:100%; height:65px; object-fit:cover; border-radius:4px; pointer-events:none;" />
+                <span style="font-size:11px; color:#475569; font-weight:600;">#${actualIndex + 1}</span>
+              </div>
+            `;
+          }).join('')}
         </div>
-        <small class="muted" style="display:block; margin-top:8px;">💡 Arrastrá una foto para cambiarle el orden. La #1 es la principal. El orden se guarda al tocar "Guardar".</small>
+        <small class="muted" style="display:block; margin-top:8px;">💡 Arrastrá las fotos adicionales para reordenarlas. Los cambios se guardan al tocar "Guardar".</small>
       `;
       setupDragAndDrop();
     }
