@@ -313,10 +313,13 @@ function openProductModal(id) {
   pendingRef = generateRef();
   const price = getEffectivePrice(p);
   
-  // Determinar la imagen inicial
-  const images = p.images || (p.image_ids ? p.image_ids.map(imgId => ({ id: imgId, color_key: null })) : []);
+  // Obtener la lista de imágenes (soporta tanto el formato nuevo como antiguo)
+  const images = p.images || (p.image_ids ? p.image_ids.map(imgId => ({ id: imgId })) : []);
   currentActiveImageId = images.length ? images[0].id : null;
   updateModalImageDisplay();
+
+  // Renderizar la galería de miniaturas adicionales si hay más de una foto
+  renderModalThumbnails(images);
 
   const catObj = (appData.categories || []).find(c => c.id === p.category_id);
 
@@ -324,9 +327,6 @@ function openProductModal(id) {
   document.getElementById("modalCategory").textContent = catObj ? catObj.name : "General";
   document.getElementById("modalTitle").textContent = p.name;
   document.getElementById("modalPrice").textContent = formatGs(price);
-
-  // Renderizar galería de miniaturas si hay más de una foto
-  renderModalThumbnails(images);
 
   // Renderizar variantes de color
   const colors = getColorObjects(p);
@@ -344,7 +344,6 @@ function openProductModal(id) {
         const colorName = btn.dataset.name;
         selectColor(colorName, btn);
         
-        // Si hay una foto asociada a este color, cambiar la imagen principal
         const matchedColorObj = colors.find(c => c.name === colorName);
         if (matchedColorObj && matchedColorObj.image_id) {
           currentActiveImageId = matchedColorObj.image_id;
@@ -354,7 +353,6 @@ function openProductModal(id) {
     });
     selectedColor = colors[0].name;
     
-    // Seleccionar imagen del primer color por defecto si la tiene
     if (colors[0].image_id) {
       currentActiveImageId = colors[0].image_id;
       updateModalImageDisplay();
@@ -379,6 +377,49 @@ function openProductModal(id) {
   document.body.style.overflow = "hidden";
   lucide.createIcons();
 }
+
+function updateModalImageDisplay() {
+  const imgEl = document.getElementById("modalImg");
+  if (currentActiveImageId) {
+    imgEl.src = `/api/image/${currentActiveImageId}`;
+  } else {
+    imgEl.src = 'https://placehold.co/400x400/f1f5f9/64748b?text=Sin+Foto';
+  }
+}
+
+function renderModalThumbnails(images) {
+  const thumbContainer = document.getElementById("modalThumbnails");
+  if (!thumbContainer) return;
+
+  if (images.length <= 1) {
+    thumbContainer.innerHTML = "";
+    thumbContainer.classList.add("hidden");
+    return;
+  }
+
+  thumbContainer.classList.remove("hidden");
+  thumbContainer.innerHTML = images.map((img) => `
+    <button type="button" onclick="setActiveImage(${img.id})" class="w-14 h-14 rounded-xl overflow-hidden border-2 shrink-0 ${currentActiveImageId === img.id ? 'border-brand-600 shadow-sm' : 'border-slate-200 opacity-70 hover:opacity-100'} transition cursor-pointer">
+      <img src="/api/image/${img.id}" class="w-full h-full object-cover" />
+    </button>
+  `).join("");
+}
+
+window.setActiveImage = function(imgId) {
+  currentActiveImageId = imgId;
+  updateModalImageDisplay();
+  
+  // Actualizar los bordes y opacidad de las miniaturas activas
+  const thumbContainer = document.getElementById("modalThumbnails");
+  if (thumbContainer) {
+    thumbContainer.querySelectorAll("button").forEach(btn => {
+      const isActive = btn.getAttribute("onclick").includes(`setActiveImage(${imgId})`);
+      btn.className = isActive 
+        ? "w-14 h-14 rounded-xl overflow-hidden border-2 border-brand-600 shadow-sm shrink-0 transition cursor-pointer" 
+        : "w-14 h-14 rounded-xl overflow-hidden border-2 border-slate-200 opacity-70 hover:opacity-100 shrink-0 transition cursor-pointer";
+    });
+  }
+};
 
 function updateModalImageDisplay() {
   const imgEl = document.getElementById("modalImg");
