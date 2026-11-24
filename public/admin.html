@@ -39,11 +39,28 @@
     </header>
 
     <main class="container">
+      <!-- <section id="tab-products" class="tab-panel active">
+        <div class="panel-head">
+          <h2>Productos</h2>
+          <button type="button" id="newProductBtn" class="btn btn-primary btn-sm">+ Nuevo producto</button>
+        </div>
+        <div id="productsList" class="cards-list"></div>
+      </section> -->
       <section id="tab-products" class="tab-panel active">
         <div class="panel-head">
           <h2>Productos</h2>
           <button type="button" id="newProductBtn" class="btn btn-primary btn-sm">+ Nuevo producto</button>
         </div>
+        
+        <!-- Buscador y botones de ordenamiento -->
+        <div class="admin-controls" style="margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar producto por nombre..." style="flex: 1; min-width: 220px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff;">
+            <div style="display: flex; gap: 6px;">
+                <button type="button" id="sortByName" class="btn btn-ghost btn-sm" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1;">🔤 Nombre</button>
+                <button type="button" id="sortByPrice" class="btn btn-ghost btn-sm" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1;">💲 Precio</button>
+            </div>
+        </div>
+
         <div id="productsList" class="cards-list"></div>
       </section>
 
