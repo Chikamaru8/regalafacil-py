@@ -254,13 +254,19 @@ function populateFormOptions() {
 }
 
 let productVariants = [];
-let productImagesList = [];
+let mainPhotoObj = null;       // Objeto independiente para la foto principal { id }
+let galleryImagesList = [];    // Array independiente exclusivo para la galería adicional
 
 /* --- Colores / variantes --- */
 function renderVariantsForm(variants = productVariants) {
   productVariants = variants;
   const container = $('#productVariantsList');
   if (!container) return;
+
+  const allAvailableImages = [
+    ...(mainPhotoObj ? [mainPhotoObj] : []),
+    ...galleryImagesList
+  ];
 
   if (!variants.length) {
     container.innerHTML = '<p class="muted" style="font-size:12px;">Sin variantes de color añadidas.</p>';
@@ -273,8 +279,8 @@ function renderVariantsForm(variants = productVariants) {
 
       <select data-variant-img="${index}" style="padding:6px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
         <option value="">📸 Foto por defecto</option>
-        ${productImagesList.map((img, imgIdx) => `
-          <option value="${img.id}" ${Number(v.image_id) === Number(img.id) ? 'selected' : ''}>Foto #${imgIdx + 1}</option>
+        ${allAvailableImages.map((img, imgIdx) => `
+          <option value="${img.id}" ${Number(v.image_id) === Number(img.id) ? 'selected' : ''}>${imgIdx === 0 ? 'Foto Principal' : 'Foto #' + (imgIdx + 1)}</option>
         `).join('')}
       </select>
 
@@ -313,7 +319,7 @@ if (addVariantBtn && !addVariantBtn.dataset.listener) {
   });
 }
 
-/* --- Foto principal (vista previa con boton ✕) --- */
+/* --- Foto principal independiente (con vista previa y boton ✕) --- */
 let mainPreviewUrl = null;
 
 function renderMainPreview() {
@@ -331,8 +337,8 @@ function renderMainPreview() {
     mainPreviewUrl = URL.createObjectURL(state.selectedFile);
     src = mainPreviewUrl;
     note = 'Foto nueva pendiente de guardar.';
-  } else if (productImagesList[0]) {
-    src = imgUrl(productImagesList[0].id);
+  } else if (mainPhotoObj) {
+    src = imgUrl(mainPhotoObj.id);
   }
 
   if (!src) {
@@ -358,46 +364,42 @@ async function removeMainPhoto() {
     return;
   }
 
-  const first = productImagesList[0];
-  if (!first) return;
+  if (!mainPhotoObj) return;
+  if (!confirm('¿Eliminar la foto principal del producto?')) return;
 
-  if (!confirm('¿Eliminar la foto principal del producto? La siguiente foto pasará a ser la principal.')) return;
-  
-  await deleteImageById(first.id);
-  
-  // Forzamos el re-renderizado inmediato de la galería superior e inferior
-  renderProductImagesGallery(productImagesList);
+  try {
+    await api(`/api/admin/image?id=${mainPhotoObj.id}`, { method: 'DELETE' });
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+
+  mainPhotoObj = null;
+  renderMainPreview();
+  renderVariantsForm(productVariants);
 }
 
-/* --- Galería de fotos adicionales (Muestra desde la segunda imagen en adelante) --- */
-function renderProductImagesGallery(images = productImagesList) {
-  productImagesList = images;
+/* --- Galería de fotos adicionales (Independiente) --- */
+function renderGallery() {
   const container = $('#productImagesGallery');
+  if (!container) return;
 
-  if (container) {
-    // Tomamos desde el índice 1 en adelante para que la principal (índice 0) no se repita aquí
-    const galleryImages = images.slice(1);
-
-    if (!galleryImages.length) {
-      container.innerHTML = '<p class="muted" style="font-size:12px;">No hay fotos adicionales en la galería.</p>';
-    } else {
-      container.innerHTML = `
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;" id="dragGalleryContainer">
-          ${galleryImages.map((img, idx) => {
-            const actualIndex = idx + 1; // Índice real en el array completo
-            return `
-              <div draggable="true" data-index="${actualIndex}" class="draggable-thumb" style="position:relative; width:85px; height:95px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#f8fafc; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
-                <button type="button" onclick="deleteProductImage(${img.id})" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
-                <img src="${imgUrl(img.id)}" alt="" style="width:100%; height:65px; object-fit:cover; border-radius:4px; pointer-events:none;" />
-                <span style="font-size:11px; color:#475569; font-weight:600;">#${actualIndex + 1}</span>
-              </div>
-            `;
-          }).join('')}
-        </div>
-        <small class="muted" style="display:block; margin-top:8px;">💡 Arrastrá las fotos adicionales para reordenarlas. Los cambios se guardan al tocar "Guardar".</small>
-      `;
-      setupDragAndDrop();
-    }
+  if (!galleryImagesList.length) {
+    container.innerHTML = '<p class="muted" style="font-size:12px;">No hay fotos adicionales en la galería.</p>';
+  } else {
+    container.innerHTML = `
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;" id="dragGalleryContainer">
+        ${galleryImagesList.map((img, idx) => `
+          <div draggable="true" data-index="${idx}" class="draggable-thumb" style="position:relative; width:85px; height:95px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#f8fafc; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
+            <button type="button" onclick="deleteGalleryImage(${img.id})" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
+            <img src="${imgUrl(img.id)}" alt="" style="width:100%; height:65px; object-fit:cover; border-radius:4px; pointer-events:none;" />
+            <span style="font-size:11px; color:#475569; font-weight:600;">#${idx + 2}</span>
+          </div>
+        `).join('')}
+      </div>
+      <small class="muted" style="display:block; margin-top:8px;">💡 Arrastrá las fotos adicionales para reordenarlas.</small>
+    `;
+    setupDragAndDrop();
   }
 
   renderMainPreview();
@@ -425,16 +427,17 @@ function setupDragAndDrop() {
       e.preventDefault();
       const targetIndex = Number(item.dataset.index);
       if (draggedIndex !== null && draggedIndex !== targetIndex) {
-        const moved = productImagesList.splice(draggedIndex, 1)[0];
-        productImagesList.splice(targetIndex, 0, moved);
+        const moved = galleryImagesList.splice(draggedIndex, 1)[0];
+        galleryImagesList.splice(targetIndex, 0, moved);
         draggedIndex = null;
-        renderProductImagesGallery(productImagesList);
+        renderGallery();
       }
     });
   });
 }
 
-async function deleteImageById(imageId) {
+window.deleteGalleryImage = async function (imageId) {
+  if (!confirm('¿Eliminar esta foto de la galería?')) return;
   try {
     await api(`/api/admin/image?id=${imageId}`, { method: 'DELETE' });
   } catch (err) {
@@ -442,21 +445,11 @@ async function deleteImageById(imageId) {
     return;
   }
 
-  productImagesList = productImagesList.filter((img) => img.id !== imageId);
+  galleryImagesList = galleryImagesList.filter((img) => img.id !== imageId);
   productVariants.forEach((v) => {
     if (Number(v.image_id) === Number(imageId)) v.image_id = null;
   });
-
-  if (state.editingProduct) {
-    state.editingProduct.image_ids = productImagesList.map((i) => i.id);
-  }
-  renderProductImagesGallery(productImagesList);
-  renderProducts(visibleProducts());
-}
-
-window.deleteProductImage = async function (imageId) {
-  if (!confirm('¿Eliminar esta foto?')) return;
-  await deleteImageById(imageId);
+  renderGallery();
 };
 
 const addMoreImagesBtn = $('#addMoreImagesBtn');
@@ -480,16 +473,19 @@ if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
         fd.append('product_id', String(prodId));
         fd.append('file', compressed, 'photo');
         const res = await api('/api/admin/image', { method: 'POST', body: fd });
-        if (res && res.id) productImagesList.push({ id: res.id });
+        if (res && res.id) galleryImagesList.push({ id: res.id });
       } catch (err) {
         alert(`No se pudo subir una de las fotos: ${err.message}`);
       }
     }
 
     e.target.value = '';
-    renderProductImagesGallery(productImagesList);
+    renderGallery();
     if (state.editingProduct) {
-      state.editingProduct.image_ids = productImagesList.map((i) => i.id);
+      state.editingProduct.image_ids = [
+        ...(mainPhotoObj ? [mainPhotoObj.id] : []),
+        ...galleryImagesList.map(i => i.id)
+      ];
     }
     await refreshBootstrap();
   });
@@ -514,8 +510,10 @@ function openProductModal(prod = null) {
   productVariants = variants;
 
   const ids = prod ? (prod.images ? prod.images.map((i) => i.id) : (prod.image_ids || [])) : [];
-  productImagesList = ids.map((id) => ({ id }));
-  renderProductImagesGallery(productImagesList);
+  mainPhotoObj = ids.length ? { id: ids[0] } : null;
+  galleryImagesList = ids.slice(1).map((id) => ({ id }));
+
+  renderGallery();
 
   if (prod) {
     $('#productModalTitle').textContent = 'Editar producto';
@@ -538,6 +536,9 @@ function openProductModal(prod = null) {
     $('#productForm').reset();
     $('#prodId').value = '';
     $('#prodStatus').value = 'active';
+    mainPhotoObj = null;
+    galleryImagesList = [];
+    renderGallery();
     $('#deleteProductBtn').hidden = true;
   }
 
@@ -650,8 +651,6 @@ $('#productForm').addEventListener('submit', async (e) => {
       }))
       .filter((v) => v.name);
 
-    // 1) Si hay foto principal nueva seleccionada, primero debemos guardar/crear el producto si es nuevo
-    // para obtener su ID, y luego subirla para colocarla al principio (unshift).
     let targetId = idVal;
 
     if (!targetId) {
@@ -672,7 +671,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       $('#deleteProductBtn').hidden = false;
     }
 
-    // 2) Subir nueva foto principal si existe y ponerla al inicio
+    // Subir nueva foto principal si existe
     if (state.selectedFile && targetId) {
       const fd = new FormData();
       fd.append('product_id', String(targetId));
@@ -680,7 +679,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       try {
         const resImg = await api('/api/admin/image', { method: 'POST', body: fd });
         if (resImg && resImg.id) {
-          productImagesList.unshift({ id: resImg.id });
+          mainPhotoObj = { id: resImg.id };
         }
       } catch (imgErr) {
         await refreshBootstrap();
@@ -688,8 +687,11 @@ $('#productForm').addEventListener('submit', async (e) => {
       }
     }
 
-    // 3) Construir el payload final con el orden exacto de las imágenes (image_ids)
-    const finalImageIds = productImagesList.map((img) => img.id);
+    // Unir orden final enviando siempre [Principal, ...Galería]
+    const finalImageIds = [
+      ...(mainPhotoObj ? [mainPhotoObj.id] : []),
+      ...galleryImagesList.map((img) => img.id)
+    ];
 
     const payload = {
       id: targetId,
@@ -701,7 +703,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       status: $('#prodStatus').value,
       description: $('#prodDesc').value.trim(),
       tag_ids: tagIds,
-      image_ids: finalImageIds, // <--- Aquí se envía el orden correcto y la principal al backend
+      image_ids: finalImageIds,
       colors: JSON.stringify(colors)
     };
 
