@@ -254,28 +254,22 @@ function populateFormOptions() {
 }
 
 /* ============================================================
-   ESTADO DE IMÁGENES — ARRAY ÚNICO (FUENTE ÚNICA DE VERDAD)
-   ------------------------------------------------------------
-   INVARIANTE:
-   productImagesList[0]  → Foto Principal  (o undefined si vacío)
-   productImagesList[1..] → Galería Adicional
-   Cada elemento: { id: number }
+   ESTADO DE IMÁGENES SEPARADO (FOTO PRINCIPAL + GALERÍA ADICIONAL)
+   - mainPhotoId: ID único de la foto principal (o null)
+   - galleryImagesList: Array de IDs exclusivos para la galería
    ============================================================ */
 let productVariants = [];
-let productImagesList = [];   // ← ÚNICO array de imágenes
+let mainPhotoId = null;
+let galleryImagesList = [];
 let mainPreviewUrl = null;
 
-/* --- Helpers derivados (solo lectura) --- */
-const getMainImage = () => productImagesList[0] || null;
-const getGalleryImages = () => productImagesList.slice(1);
-const getImageIds = () => productImagesList.map((i) => i.id);
-
-/**
- * Limpia referencias huérfanas en variantes contra los IDs vivos
- * del array único. Se invoca tras cada mutación.
- */
 function syncVariantsWithImages() {
-  const validIds = new Set(getImageIds().map(Number));
+  const validIds = new Set();
+  if (mainPhotoId) validIds.add(Number(mainPhotoId));
+  for (const id of galleryImagesList) {
+    if (id) validIds.add(Number(id));
+  }
+
   let changed = false;
   for (const v of productVariants) {
     if (v.image_id && !validIds.has(Number(v.image_id))) {
@@ -286,17 +280,13 @@ function syncVariantsWithImages() {
   if (changed) renderVariantsForm(productVariants);
 }
 
-/**
- * Punto único de re-render para la sección de imágenes.
- * Fuerza cache-bust vía imgUrl() en cada llamada.
- */
 function renderImagesSection() {
   renderMainPreview();
   renderGallery();
   renderVariantsForm(productVariants);
 }
 
-/* --- Foto principal (siempre productImagesList[0]) --- */
+/* --- Foto principal independiente --- */
 function renderMainPreview() {
   const box = $('#prodImagePreview');
   if (!box) return;
@@ -312,9 +302,8 @@ function renderMainPreview() {
     mainPreviewUrl = URL.createObjectURL(state.selectedFile);
     src = mainPreviewUrl;
     note = 'Foto nueva pendiente de guardar.';
-  } else {
-    const main = getMainImage();
-    if (main) src = imgUrl(main.id);
+  } else if (mainPhotoId) {
+    src = imgUrl(mainPhotoId);
   }
 
   if (!src) {
@@ -333,7 +322,6 @@ function renderMainPreview() {
 }
 
 async function removeMainPhoto() {
-  // Caso 1: hay archivo local pendiente → se descarta sin tocar BD
   if (state.selectedFile) {
     state.selectedFile = null;
     $('#prodImageFile').value = '';
@@ -341,48 +329,40 @@ async function removeMainPhoto() {
     return;
   }
 
-  const main = getMainImage();
-  if (!main) return;
+  if (!mainPhotoId) return;
   if (!confirm('¿Eliminar la foto principal del producto?')) return;
 
   try {
-    await api(`/api/admin/image?id=${main.id}`, { method: 'DELETE' });
+    await api(`/api/admin/image?id=${mainPhotoId}`, { method: 'DELETE' });
   } catch (err) {
     alert(err.message);
     return;
   }
 
-  // Mutación atómica: sacar el índice [0]. La galería sube un lugar automáticamente.
-  productImagesList.shift();
-
+  mainPhotoId = null;
   syncVariantsWithImages();
   renderImagesSection();
 }
 
-/* --- Galería adicional (productImagesList[1..]) --- */
+/* --- Galería adicional independiente (con numeración Foto #1, #2...) --- */
 function renderGallery() {
   const container = $('#productImagesGallery');
   if (!container) return;
 
-  const gallery = getGalleryImages();
-
-  if (!gallery.length) {
+  if (!galleryImagesList.length) {
     container.innerHTML = '<p class="muted" style="font-size:12px;">No hay fotos adicionales en la galería.</p>';
     return;
   }
 
   container.innerHTML = `
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;" id="dragGalleryContainer">
-      ${gallery.map((img, gIdx) => {
-        const realIdx = gIdx + 1; // índice real dentro de productImagesList
-        return `
-          <div draggable="true" data-index="${realIdx}" class="draggable-thumb" style="position:relative; width:85px; height:95px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#f8fafc; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
-            <button type="button" onclick="deleteGalleryImage(${realIdx})" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
-            <img src="${imgUrl(img.id)}" alt="" style="width:100%; height:65px; object-fit:cover; border-radius:4px; pointer-events:none;" />
-            <span style="font-size:11px; color:#475569; font-weight:600;">#${realIdx + 1}</span>
-          </div>
-        `;
-      }).join('')}
+      ${galleryImagesList.map((id, idx) => `
+        <div draggable="true" data-index="${idx}" class="draggable-thumb" style="position:relative; width:85px; height:95px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#f8fafc; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
+          <button type="button" onclick="deleteGalleryImage(${id})" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
+          <img src="${imgUrl(id)}" alt="" style="width:100%; height:65px; object-fit:cover; border-radius:4px; pointer-events:none;" />
+          <span style="font-size:11px; color:#475569; font-weight:600;">Foto #${idx + 1}</span>
+        </div>
+      `).join('')}
     </div>
     <small class="muted" style="display:block; margin-top:8px;">💡 Arrastrá las fotos adicionales para reordenarlas.</small>
   `;
@@ -393,11 +373,11 @@ function setupDragAndDrop() {
   const container = $('#dragGalleryContainer');
   if (!container) return;
 
-  let draggedRealIdx = null;
+  let draggedIndex = null;
 
   container.querySelectorAll('.draggable-thumb').forEach((item) => {
     item.addEventListener('dragstart', (e) => {
-      draggedRealIdx = Number(item.dataset.index);
+      draggedIndex = Number(item.dataset.index);
       e.dataTransfer.effectAllowed = 'move';
     });
 
@@ -408,36 +388,27 @@ function setupDragAndDrop() {
 
     item.addEventListener('drop', (e) => {
       e.preventDefault();
-      const targetRealIdx = Number(item.dataset.index);
-      if (draggedRealIdx !== null && draggedRealIdx !== targetRealIdx) {
-        // Ambos índices son >= 1 (nunca tocan [0])
-        const moved = productImagesList.splice(draggedRealIdx, 1)[0];
-        productImagesList.splice(targetRealIdx, 0, moved);
-        draggedRealIdx = null;
+      const targetIndex = Number(item.dataset.index);
+      if (draggedIndex !== null && draggedIndex !== targetIndex) {
+        const moved = galleryImagesList.splice(draggedIndex, 1)[0];
+        galleryImagesList.splice(targetIndex, 0, moved);
+        draggedIndex = null;
         renderImagesSection();
       }
     });
   });
 }
 
-window.deleteGalleryImage = async function (realIdx) {
-  // Salvaguarda: nunca permitir borrar la principal por esta vía
-  if (realIdx <= 0) {
-    alert('Para eliminar la foto principal usá el botón ✕ sobre ella.');
-    return;
-  }
-  const img = productImagesList[realIdx];
-  if (!img) return;
+window.deleteGalleryImage = async function (imageId) {
   if (!confirm('¿Eliminar esta foto de la galería?')) return;
-
   try {
-    await api(`/api/admin/image?id=${img.id}`, { method: 'DELETE' });
+    await api(`/api/admin/image?id=${imageId}`, { method: 'DELETE' });
   } catch (err) {
     alert(err.message);
     return;
   }
 
-  productImagesList.splice(realIdx, 1);
+  galleryImagesList = galleryImagesList.filter((id) => Number(id) !== Number(imageId));
   syncVariantsWithImages();
   renderImagesSection();
 };
@@ -464,12 +435,7 @@ if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
         fd.append('file', compressed, 'photo');
         const res = await api('/api/admin/image', { method: 'POST', body: fd });
         if (res && res.id) {
-          // Si no hay principal → se promueve automáticamente (push al final = índice 0)
-          if (productImagesList.length === 0) {
-            productImagesList.push({ id: res.id });
-          } else {
-            productImagesList.push({ id: res.id }); // siempre a galería
-          }
+          galleryImagesList.push(res.id);
         }
       } catch (err) {
         alert(`No se pudo subir una de las fotos: ${err.message}`);
@@ -479,21 +445,14 @@ if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
     e.target.value = '';
     syncVariantsWithImages();
     renderImagesSection();
-
-    if (state.editingProduct) {
-      state.editingProduct.image_ids = getImageIds();
-    }
   });
 }
 
-/* --- Colores / variantes --- */
+/* --- Variantes de Color (con "Foto por defecto" y fotos de galería numeradas) --- */
 function renderVariantsForm(variants = productVariants) {
   productVariants = variants;
   const container = $('#productVariantsList');
   if (!container) return;
-
-  // Lista combinada respetando el orden del array único
-  const allAvailableImages = [...productImagesList];
 
   if (!variants.length) {
     container.innerHTML = '<p class="muted" style="font-size:12px;">Sin variantes de color añadidas.</p>';
@@ -505,9 +464,9 @@ function renderVariantsForm(variants = productVariants) {
       <input type="text" value="${escapeHtml(v.name || '')}" placeholder="Ej: Marrón, Rosa..." data-variant-name="${index}" style="flex:1; min-width:110px; padding:6px 8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;" />
 
       <select data-variant-img="${index}" style="padding:6px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
-        <option value="">📸 Foto por defecto</option>
-        ${allAvailableImages.map((img, imgIdx) => `
-          <option value="${img.id}" ${Number(v.image_id) === Number(img.id) ? 'selected' : ''}>Foto #${imgIdx + 1}</option>
+        <option value="">📸 Foto por defecto (Principal)</option>
+        ${galleryImagesList.map((id, gIdx) => `
+          <option value="${id}" ${Number(v.image_id) === Number(id) ? 'selected' : ''}>Foto #${gIdx + 1}</option>
         `).join('')}
       </select>
 
@@ -553,7 +512,6 @@ function openProductModal(prod = null) {
   $('#prodImageFile').value = '';
   $('#productFormError').hidden = true;
 
-  // Variantes
   let variants = [];
   try {
     const raw = prod && prod.colors ? (typeof prod.colors === 'string' ? JSON.parse(prod.colors) : prod.colors) : [];
@@ -566,9 +524,10 @@ function openProductModal(prod = null) {
   }
   productVariants = variants;
 
-  // Hidratar el array único desde el backend
+  // Cargar IDs separados: [0] es la principal, [1...] es la galería
   const ids = prod ? (prod.images ? prod.images.map((i) => i.id) : (prod.image_ids || [])) : [];
-  productImagesList = ids.map((id) => ({ id }));
+  mainPhotoId = ids.length > 0 ? ids[0] : null;
+  galleryImagesList = ids.slice(1);
 
   renderImagesSection();
 
@@ -593,7 +552,8 @@ function openProductModal(prod = null) {
     $('#productForm').reset();
     $('#prodId').value = '';
     $('#prodStatus').value = 'active';
-    productImagesList = [];
+    mainPhotoId = null;
+    galleryImagesList = [];
     productVariants = [];
     renderImagesSection();
     $('#deleteProductBtn').hidden = true;
@@ -675,7 +635,7 @@ $('#prodImageFile').addEventListener('change', async (e) => {
   renderMainPreview();
 });
 
-/* ---------- SUBMIT ATÓMICO ---------- */
+/* ---------- SUBMIT ATÓMICO SEPARADO ---------- */
 $('#productForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('#productFormError').hidden = true;
@@ -684,7 +644,6 @@ $('#productForm').addEventListener('submit', async (e) => {
   try {
     const idVal = Number($('#prodId').value);
 
-    // Validaciones de precio/oferta
     const price = digitsToInt($('#prodPrice').value);
     if (!(price > 0)) throw new Error('Ingresá el precio normal.');
 
@@ -705,14 +664,13 @@ $('#productForm').addEventListener('submit', async (e) => {
     const colors = productVariants
       .map((v) => ({
         name: String(v.name || '').trim(),
-        image_id: v.image_id || null,
+        image_id: v.image_id ? Number(v.image_id) : null,
         image_url: v.image_id ? `/api/image/${v.image_id}` : null
       }))
       .filter((v) => v.name);
 
     let targetId = idVal;
 
-    // --- Paso 1: crear producto si es nuevo (sin imágenes aún) ---
     if (!targetId) {
       const tempPayload = {
         name: $('#prodName').value.trim(),
@@ -731,7 +689,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       $('#deleteProductBtn').hidden = false;
     }
 
-    // --- Paso 2: subir la foto principal nueva (si existe) y forzar índice [0] ---
+    // Subir foto principal nueva si existe
     if (state.selectedFile && targetId) {
       const fd = new FormData();
       fd.append('product_id', String(targetId));
@@ -739,19 +697,20 @@ $('#productForm').addEventListener('submit', async (e) => {
       try {
         const resImg = await api('/api/admin/image', { method: 'POST', body: fd });
         if (resImg && resImg.id) {
-          // unshift → queda inquebrantablemente en [0]
-          productImagesList.unshift({ id: resImg.id });
+          mainPhotoId = Number(resImg.id);
         }
       } catch (imgErr) {
         await refreshBootstrap();
         throw new Error(`El producto se guardó, pero la foto principal no se pudo subir: ${imgErr.message}.`);
       }
-      state.selectedFile = null;
-      $('#prodImageFile').value = '';
     }
 
-    // --- Paso 3: construir payload ATÓMICO desde el array único ---
-    const finalImageIds = getImageIds();
+    // Construcción final: [Foto Principal, ...Galería Adicional]
+    const finalImageIds = [];
+    if (mainPhotoId) finalImageIds.push(Number(mainPhotoId));
+    for (const galId of galleryImagesList) {
+      if (galId) finalImageIds.push(Number(galId));
+    }
 
     const payload = {
       id: targetId,
@@ -772,6 +731,8 @@ $('#productForm').addEventListener('submit', async (e) => {
       body: JSON.stringify(payload)
     });
 
+    state.selectedFile = null;
+    $('#prodImageFile').value = '';
     $('#productModal').close();
     await refreshBootstrap();
   } catch (err) {
