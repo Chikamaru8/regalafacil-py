@@ -361,8 +361,12 @@ async function removeMainPhoto() {
   const first = productImagesList[0];
   if (!first) return;
 
-  if (!confirm('¿Eliminar la foto principal del producto?')) return;
+  if (!confirm('¿Eliminar la foto principal del producto? La siguiente foto pasará a ser la principal.')) return;
+  
   await deleteImageById(first.id);
+  
+  // Forzamos el re-renderizado inmediato de la galería superior e inferior
+  renderProductImagesGallery(productImagesList);
 }
 
 /* --- Galería de fotos adicionales (Muestra desde la segunda imagen en adelante) --- */
