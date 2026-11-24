@@ -262,7 +262,7 @@ function populateFormOptions() {
    Cada elemento: { id: number }
    ============================================================ */
 let productVariants = [];
-let productImagesList = [];   
+let productImagesList = [];   // ← ÚNICO array de imágenes
 let mainPreviewUrl = null;
 
 /* --- Helpers derivados (solo lectura) --- */
@@ -270,6 +270,10 @@ const getMainImage = () => productImagesList[0] || null;
 const getGalleryImages = () => productImagesList.slice(1);
 const getImageIds = () => productImagesList.map((i) => i.id);
 
+/**
+ * Limpia referencias huérfanas en variantes contra los IDs vivos
+ * del array único. Se invoca tras cada mutación.
+ */
 function syncVariantsWithImages() {
   const validIds = new Set(getImageIds().map(Number));
   let changed = false;
@@ -282,6 +286,10 @@ function syncVariantsWithImages() {
   if (changed) renderVariantsForm(productVariants);
 }
 
+/**
+ * Punto único de re-render para la sección de imágenes.
+ * Fuerza cache-bust vía imgUrl() en cada llamada.
+ */
 function renderImagesSection() {
   renderMainPreview();
   renderGallery();
@@ -325,6 +333,7 @@ function renderMainPreview() {
 }
 
 async function removeMainPhoto() {
+  // Caso 1: hay archivo local pendiente → se descarta sin tocar BD
   if (state.selectedFile) {
     state.selectedFile = null;
     $('#prodImageFile').value = '';
@@ -343,7 +352,9 @@ async function removeMainPhoto() {
     return;
   }
 
+  // Mutación atómica: sacar el índice [0]. La galería sube un lugar automáticamente.
   productImagesList.shift();
+
   syncVariantsWithImages();
   renderImagesSection();
 }
@@ -363,7 +374,7 @@ function renderGallery() {
   container.innerHTML = `
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;" id="dragGalleryContainer">
       ${gallery.map((img, gIdx) => {
-        const realIdx = gIdx + 1; 
+        const realIdx = gIdx + 1; // índice real dentro de productImagesList
         return `
           <div draggable="true" data-index="${realIdx}" class="draggable-thumb" style="position:relative; width:85px; height:95px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#f8fafc; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
             <button type="button" onclick="deleteGalleryImage(${realIdx})" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
@@ -399,6 +410,7 @@ function setupDragAndDrop() {
       e.preventDefault();
       const targetRealIdx = Number(item.dataset.index);
       if (draggedRealIdx !== null && draggedRealIdx !== targetRealIdx) {
+        // Ambos índices son >= 1 (nunca tocan [0])
         const moved = productImagesList.splice(draggedRealIdx, 1)[0];
         productImagesList.splice(targetRealIdx, 0, moved);
         draggedRealIdx = null;
@@ -409,6 +421,7 @@ function setupDragAndDrop() {
 }
 
 window.deleteGalleryImage = async function (realIdx) {
+  // Salvaguarda: nunca permitir borrar la principal por esta vía
   if (realIdx <= 0) {
     alert('Para eliminar la foto principal usá el botón ✕ sobre ella.');
     return;
@@ -451,7 +464,12 @@ if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
         fd.append('file', compressed, 'photo');
         const res = await api('/api/admin/image', { method: 'POST', body: fd });
         if (res && res.id) {
-          productImagesList.push({ id: res.id });
+          // Si no hay principal → se promueve automáticamente (push al final = índice 0)
+          if (productImagesList.length === 0) {
+            productImagesList.push({ id: res.id });
+          } else {
+            productImagesList.push({ id: res.id }); // siempre a galería
+          }
         }
       } catch (err) {
         alert(`No se pudo subir una de las fotos: ${err.message}`);
@@ -474,6 +492,7 @@ function renderVariantsForm(variants = productVariants) {
   const container = $('#productVariantsList');
   if (!container) return;
 
+  // Lista combinada respetando el orden del array único
   const allAvailableImages = [...productImagesList];
 
   if (!variants.length) {
@@ -534,6 +553,7 @@ function openProductModal(prod = null) {
   $('#prodImageFile').value = '';
   $('#productFormError').hidden = true;
 
+  // Variantes
   let variants = [];
   try {
     const raw = prod && prod.colors ? (typeof prod.colors === 'string' ? JSON.parse(prod.colors) : prod.colors) : [];
@@ -546,6 +566,7 @@ function openProductModal(prod = null) {
   }
   productVariants = variants;
 
+  // Hidratar el array único desde el backend
   const ids = prod ? (prod.images ? prod.images.map((i) => i.id) : (prod.image_ids || [])) : [];
   productImagesList = ids.map((id) => ({ id }));
 
@@ -663,6 +684,7 @@ $('#productForm').addEventListener('submit', async (e) => {
   try {
     const idVal = Number($('#prodId').value);
 
+    // Validaciones de precio/oferta
     const price = digitsToInt($('#prodPrice').value);
     if (!(price > 0)) throw new Error('Ingresá el precio normal.');
 
@@ -690,6 +712,7 @@ $('#productForm').addEventListener('submit', async (e) => {
 
     let targetId = idVal;
 
+    // --- Paso 1: crear producto si es nuevo (sin imágenes aún) ---
     if (!targetId) {
       const tempPayload = {
         name: $('#prodName').value.trim(),
@@ -708,6 +731,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       $('#deleteProductBtn').hidden = false;
     }
 
+    // --- Paso 2: subir la foto principal nueva (si existe) y forzar índice [0] ---
     if (state.selectedFile && targetId) {
       const fd = new FormData();
       fd.append('product_id', String(targetId));
@@ -715,14 +739,18 @@ $('#productForm').addEventListener('submit', async (e) => {
       try {
         const resImg = await api('/api/admin/image', { method: 'POST', body: fd });
         if (resImg && resImg.id) {
+          // unshift → queda inquebrantablemente en [0]
           productImagesList.unshift({ id: resImg.id });
         }
       } catch (imgErr) {
         await refreshBootstrap();
         throw new Error(`El producto se guardó, pero la foto principal no se pudo subir: ${imgErr.message}.`);
       }
+      state.selectedFile = null;
+      $('#prodImageFile').value = '';
     }
 
+    // --- Paso 3: construir payload ATÓMICO desde el array único ---
     const finalImageIds = getImageIds();
 
     const payload = {
@@ -744,8 +772,6 @@ $('#productForm').addEventListener('submit', async (e) => {
       body: JSON.stringify(payload)
     });
 
-    state.selectedFile = null;
-    $('#prodImageFile').value = '';
     $('#productModal').close();
     await refreshBootstrap();
   } catch (err) {
