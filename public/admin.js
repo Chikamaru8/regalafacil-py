@@ -286,7 +286,7 @@ function renderImagesSection() {
   renderVariantsForm(productVariants);
 }
 
-/* --- Foto principal (TOTALMENTE AISLADA, SIN NÚMEROS NI INTERACCIÓN CON GALERÍA) --- */
+/* --- Foto principal (TOTALMENTE AISLADA) --- */
 function renderMainPreview() {
   const box = $('#prodImagePreview');
   if (!box) return;
@@ -339,13 +339,12 @@ async function removeMainPhoto() {
     return;
   }
 
-  // AL BORRAR LA PRINCIPAL, QUEDA VACÍA. NUNCA TOCA LA GALERÍA.
   mainPhotoId = null;
   syncVariantsWithImages();
   renderImagesSection();
 }
 
-/* --- Galería adicional independiente (con numeración Foto #1, #2...) --- */
+/* --- Galería adicional independiente (Foto #1, #2...) --- */
 function renderGallery() {
   const container = $('#productImagesGallery');
   if (!container) return;
@@ -525,13 +524,118 @@ function openProductModal(prod = null) {
   }
   productVariants = variants;
 
-  /* ---------- SUBMIT ATÓMICO BLINDADO (ORDEN ESTRICTO) ---------- */
-$('#productForm').addEventListener('submit', (e) => {
-  // Evitamos que se ejecute de forma síncrona mal el evento anterior si existía
-  e.stopImmediatePropagation();
-}, true);
+  const ids = prod ? (prod.images ? prod.images.map((i) => i.id) : (prod.image_ids || [])) : [];
+  mainPhotoId = ids.length > 0 ? ids[0] : null;
+  galleryImagesList = ids.slice(1);
 
-$('#productForm').onsubmit = async (e) => {
+  renderImagesSection();
+
+  if (prod) {
+    $('#productModalTitle').textContent = 'Editar producto';
+    $('#prodId').value = prod.id;
+    $('#prodName').value = prod.name || '';
+    $('#prodPrice').value = dots(prod.price_gs);
+    $('#prodOfferPrice').value = offerActive(prod) ? prod.offer_price_gs : '';
+    $('#prodOfferEnds').value = offerActive(prod) ? toLocalInput(prod.offer_ends_at) : '';
+    $('#prodCategory').value = prod.category_id || '';
+    $('#prodStatus').value = prod.status || 'active';
+    $('#prodDesc').value = prod.description || '';
+    $('#deleteProductBtn').hidden = false;
+
+    const selectedTags = new Set(prod.tag_ids || []);
+    $('#prodTags').querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.checked = selectedTags.has(Number(cb.value));
+    });
+  } else {
+    $('#productModalTitle').textContent = 'Nuevo producto';
+    $('#productForm').reset();
+    $('#prodId').value = '';
+    $('#prodStatus').value = 'active';
+    mainPhotoId = null;
+    galleryImagesList = [];
+    productVariants = [];
+    renderImagesSection();
+    $('#deleteProductBtn').hidden = true;
+  }
+
+  $('#productModal').showModal();
+}
+
+async function compressImageFile(file) {
+  const bitmap = await createImageBitmap(file);
+  const encode = (canvas, type, q) => new Promise((res) => canvas.toBlob((b) => res(b), type, q));
+  let best = null;
+
+  for (const side of [1100, 900, 720]) {
+    const ratio = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
+    canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    for (const q of [0.82, 0.7, 0.55]) {
+      let blob = await encode(canvas, 'image/webp', q);
+      if (!blob || blob.type !== 'image/webp') blob = await encode(canvas, 'image/jpeg', q);
+      if (!blob) continue;
+      best = blob;
+      if (blob.size <= 800 * 1024) { bitmap.close?.(); return blob; }
+    }
+  }
+  bitmap.close?.();
+  if (!best) throw new Error('No se pudo procesar la imagen.');
+  return best;
+}
+
+/* ---------- Eventos ---------- */
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#loginError').hidden = true;
+  $('#loginBtn').disabled = true;
+  try {
+    await api('/api/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ password: $('#loginPassword').value })
+    });
+    $('#loginPassword').value = '';
+    await showApp();
+  } catch (err) {
+    $('#loginError').textContent = err.message;
+    $('#loginError').hidden = false;
+  } finally {
+    $('#loginBtn').disabled = false;
+  }
+});
+
+$('#logoutBtn').addEventListener('click', async () => {
+  try { await api('/api/admin/logout', { method: 'POST' }); } catch {}
+  state.data = null;
+  showLogin();
+});
+
+$('#newProductBtn').addEventListener('click', () => openProductModal(null));
+$('#closeModalBtn').addEventListener('click', () => $('#productModal').close());
+
+$('#prodImageFile').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) {
+    state.selectedFile = null;
+    renderMainPreview();
+    return;
+  }
+  try {
+    state.selectedFile = await compressImageFile(file);
+    $('#productFormError').hidden = true;
+  } catch (err) {
+    state.selectedFile = null;
+    $('#prodImageFile').value = '';
+    $('#productFormError').textContent = err.message || 'No se pudo leer la foto. Probá con otra.';
+    $('#productFormError').hidden = false;
+  }
+  renderMainPreview();
+});
+
+/* ---------- SUBMIT ATÓMICO BLINDADO ---------- */
+$('#productForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('#productFormError').hidden = true;
   $('#saveProductBtn').disabled = true;
@@ -566,7 +670,6 @@ $('#productForm').onsubmit = async (e) => {
 
     let targetId = idVal;
 
-    // Paso 1: Si es un producto nuevo, crearlo primero para obtener su ID
     if (!targetId) {
       const tempPayload = {
         name: $('#prodName').value.trim(),
@@ -585,7 +688,6 @@ $('#productForm').onsubmit = async (e) => {
       $('#deleteProductBtn').hidden = false;
     }
 
-    // Paso 2: Si hay una nueva foto principal seleccionada, subirla PRIMERO
     if (state.selectedFile && targetId) {
       const fd = new FormData();
       fd.append('product_id', String(targetId));
@@ -593,30 +695,18 @@ $('#productForm').onsubmit = async (e) => {
       try {
         const resImg = await api('/api/admin/image', { method: 'POST', body: fd });
         if (resImg && resImg.id) {
-          // Si ya había una foto principal anterior y queremos reemplazarla limpia:
-          // Opcional: si deseas eliminar la anterior de la BD, puedes hacerlo aquí, 
-          // pero aseguramos que el nuevo ID se convierta en la principal absoluta:
           mainPhotoId = Number(resImg.id);
         }
       } catch (imgErr) {
         await refreshBootstrap();
-        throw new Error(`El producto se guardó, pero la foto principal nueva no se pudo subir: ${imgErr.message}.`);
+        throw new Error(`El producto se guardó, pero la foto principal no se pudo subir: ${imgErr.message}.`);
       }
-      state.selectedFile = null;
-      $('#prodImageFile').value = '';
     }
 
-    // Paso 3: CONSTRUCCIÓN DEL ARRAY FINAL DE IDS (Respetando la regla de oro)
-    // El índice [0] DEBE SER EXCLUSIVAMENTE LA FOTO PRINCIPAL (mainPhotoId).
-    // Los índices [1...] SERÁN EXCLUSIVAMENTE LOS DE LA GALERÍA (galleryImagesList).
     const finalImageIds = [];
-    if (mainPhotoId) {
-      finalImageIds.push(Number(mainPhotoId));
-    }
+    if (mainPhotoId) finalImageIds.push(Number(mainPhotoId));
     for (const galId of galleryImagesList) {
-      if (galId && Number(galId) !== Number(mainPhotoId)) {
-        finalImageIds.push(Number(galId));
-      }
+      if (galId) finalImageIds.push(Number(galId));
     }
 
     const payload = {
@@ -629,16 +719,17 @@ $('#productForm').onsubmit = async (e) => {
       status: $('#prodStatus').value,
       description: $('#prodDesc').value.trim(),
       tag_ids: tagIds,
-      image_ids: finalImageIds, // <-- Aquí va el orden blindado [Principal, ...Galería]
+      image_ids: finalImageIds,
       colors: JSON.stringify(colors)
     };
 
-    // Paso 4: Enviar el PUT definitivo al servidor
     await api('/api/admin/products', {
       method: 'PUT',
       body: JSON.stringify(payload)
     });
 
+    state.selectedFile = null;
+    $('#prodImageFile').value = '';
     $('#productModal').close();
     await refreshBootstrap();
   } catch (err) {
@@ -647,7 +738,7 @@ $('#productForm').onsubmit = async (e) => {
   } finally {
     $('#saveProductBtn').disabled = false;
   }
-};
+});
 
 $('#deleteProductBtn').addEventListener('click', async () => {
   const idVal = Number($('#prodId').value);
