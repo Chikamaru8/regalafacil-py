@@ -254,16 +254,24 @@ function populateFormOptions() {
 }
 
 /* ============================================================
-   ESTADO DE IMÁGENES — ARRAY ÚNICO (PRODUCT IMAGES LIST)
-   - productImagesList[0] = Foto Principal
-   - productImagesList[1...] = Galería Adicional
+   ESTADO DE IMÁGENES — ARRAY ÚNICO (FUENTE ÚNICA DE VERDAD)
+   ------------------------------------------------------------
+   INVARIANTE:
+   productImagesList[0]  → Foto Principal  (o undefined si vacío)
+   productImagesList[1..] → Galería Adicional
+   Cada elemento: { id: number }
    ============================================================ */
 let productVariants = [];
-let productImagesList = [];
+let productImagesList = [];   
 let mainPreviewUrl = null;
 
+/* --- Helpers derivados (solo lectura) --- */
+const getMainImage = () => productImagesList[0] || null;
+const getGalleryImages = () => productImagesList.slice(1);
+const getImageIds = () => productImagesList.map((i) => i.id);
+
 function syncVariantsWithImages() {
-  const validIds = new Set(productImagesList.map(img => Number(img.id)));
+  const validIds = new Set(getImageIds().map(Number));
   let changed = false;
   for (const v of productVariants) {
     if (v.image_id && !validIds.has(Number(v.image_id))) {
@@ -280,11 +288,193 @@ function renderImagesSection() {
   renderVariantsForm(productVariants);
 }
 
-/* --- Renderizado unificado de Variantes --- */
+/* --- Foto principal (siempre productImagesList[0]) --- */
+function renderMainPreview() {
+  const box = $('#prodImagePreview');
+  if (!box) return;
+
+  if (mainPreviewUrl) {
+    URL.revokeObjectURL(mainPreviewUrl);
+    mainPreviewUrl = null;
+  }
+
+  let src = '';
+  let note = '';
+  if (state.selectedFile) {
+    mainPreviewUrl = URL.createObjectURL(state.selectedFile);
+    src = mainPreviewUrl;
+    note = 'Foto nueva pendiente de guardar.';
+  } else {
+    const main = getMainImage();
+    if (main) src = imgUrl(main.id);
+  }
+
+  if (!src) {
+    box.innerHTML = '<p class="muted" style="font-size:12px;">Sin foto principal seleccionada.</p>';
+    return;
+  }
+
+  box.innerHTML = `
+    <div style="position:relative; display:inline-block; border:1px solid #cbd5e1; border-radius:8px; padding:4px; background:#fff;">
+      <img src="${src}" alt="Foto principal" style="width:90px; height:90px; object-fit:cover; border-radius:6px; display:block;" />
+      <button type="button" id="removeMainPhotoBtn" aria-label="Quitar foto principal" style="position:absolute; top:2px; right:2px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.25);">✕</button>
+    </div>
+    ${note ? `<small class="muted" style="display:block; margin-top:4px;">${note}</small>` : ''}
+  `;
+  $('#removeMainPhotoBtn').addEventListener('click', removeMainPhoto);
+}
+
+async function removeMainPhoto() {
+  if (state.selectedFile) {
+    state.selectedFile = null;
+    $('#prodImageFile').value = '';
+    renderImagesSection();
+    return;
+  }
+
+  const main = getMainImage();
+  if (!main) return;
+  if (!confirm('¿Eliminar la foto principal del producto?')) return;
+
+  try {
+    await api(`/api/admin/image?id=${main.id}`, { method: 'DELETE' });
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+
+  productImagesList.shift();
+  syncVariantsWithImages();
+  renderImagesSection();
+}
+
+/* --- Galería adicional (productImagesList[1..]) --- */
+function renderGallery() {
+  const container = $('#productImagesGallery');
+  if (!container) return;
+
+  const gallery = getGalleryImages();
+
+  if (!gallery.length) {
+    container.innerHTML = '<p class="muted" style="font-size:12px;">No hay fotos adicionales en la galería.</p>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;" id="dragGalleryContainer">
+      ${gallery.map((img, gIdx) => {
+        const realIdx = gIdx + 1; 
+        return `
+          <div draggable="true" data-index="${realIdx}" class="draggable-thumb" style="position:relative; width:85px; height:95px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#f8fafc; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
+            <button type="button" onclick="deleteGalleryImage(${realIdx})" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
+            <img src="${imgUrl(img.id)}" alt="" style="width:100%; height:65px; object-fit:cover; border-radius:4px; pointer-events:none;" />
+            <span style="font-size:11px; color:#475569; font-weight:600;">#${realIdx + 1}</span>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    <small class="muted" style="display:block; margin-top:8px;">💡 Arrastrá las fotos adicionales para reordenarlas.</small>
+  `;
+  setupDragAndDrop();
+}
+
+function setupDragAndDrop() {
+  const container = $('#dragGalleryContainer');
+  if (!container) return;
+
+  let draggedRealIdx = null;
+
+  container.querySelectorAll('.draggable-thumb').forEach((item) => {
+    item.addEventListener('dragstart', (e) => {
+      draggedRealIdx = Number(item.dataset.index);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const targetRealIdx = Number(item.dataset.index);
+      if (draggedRealIdx !== null && draggedRealIdx !== targetRealIdx) {
+        const moved = productImagesList.splice(draggedRealIdx, 1)[0];
+        productImagesList.splice(targetRealIdx, 0, moved);
+        draggedRealIdx = null;
+        renderImagesSection();
+      }
+    });
+  });
+}
+
+window.deleteGalleryImage = async function (realIdx) {
+  if (realIdx <= 0) {
+    alert('Para eliminar la foto principal usá el botón ✕ sobre ella.');
+    return;
+  }
+  const img = productImagesList[realIdx];
+  if (!img) return;
+  if (!confirm('¿Eliminar esta foto de la galería?')) return;
+
+  try {
+    await api(`/api/admin/image?id=${img.id}`, { method: 'DELETE' });
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+
+  productImagesList.splice(realIdx, 1);
+  syncVariantsWithImages();
+  renderImagesSection();
+};
+
+const addMoreImagesBtn = $('#addMoreImagesBtn');
+if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
+  addMoreImagesBtn.dataset.listener = 'true';
+  addMoreImagesBtn.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const prodId = Number($('#prodId').value);
+    if (!prodId) {
+      alert('Primero debés guardar el producto antes de agregarle más fotos.');
+      e.target.value = '';
+      return;
+    }
+
+    for (const file of files) {
+      try {
+        const compressed = await compressImageFile(file);
+        const fd = new FormData();
+        fd.append('product_id', String(prodId));
+        fd.append('file', compressed, 'photo');
+        const res = await api('/api/admin/image', { method: 'POST', body: fd });
+        if (res && res.id) {
+          productImagesList.push({ id: res.id });
+        }
+      } catch (err) {
+        alert(`No se pudo subir una de las fotos: ${err.message}`);
+      }
+    }
+
+    e.target.value = '';
+    syncVariantsWithImages();
+    renderImagesSection();
+
+    if (state.editingProduct) {
+      state.editingProduct.image_ids = getImageIds();
+    }
+  });
+}
+
+/* --- Colores / variantes --- */
 function renderVariantsForm(variants = productVariants) {
   productVariants = variants;
   const container = $('#productVariantsList');
   if (!container) return;
+
+  const allAvailableImages = [...productImagesList];
 
   if (!variants.length) {
     container.innerHTML = '<p class="muted" style="font-size:12px;">Sin variantes de color añadidas.</p>';
@@ -297,7 +487,7 @@ function renderVariantsForm(variants = productVariants) {
 
       <select data-variant-img="${index}" style="padding:6px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
         <option value="">📸 Foto por defecto</option>
-        ${productImagesList.map((img, imgIdx) => `
+        ${allAvailableImages.map((img, imgIdx) => `
           <option value="${img.id}" ${Number(v.image_id) === Number(img.id) ? 'selected' : ''}>Foto #${imgIdx + 1}</option>
         `).join('')}
       </select>
@@ -337,174 +527,7 @@ if (addVariantBtn && !addVariantBtn.dataset.listener) {
   });
 }
 
-/* --- Renderizado de Foto Principal (Índice 0) --- */
-function renderMainPreview() {
-  const box = $('#prodImagePreview');
-  if (!box) return;
-
-  if (mainPreviewUrl) {
-    URL.revokeObjectURL(mainPreviewUrl);
-    mainPreviewUrl = null;
-  }
-
-  let src = '';
-  let note = '';
-  if (state.selectedFile) {
-    mainPreviewUrl = URL.createObjectURL(state.selectedFile);
-    src = mainPreviewUrl;
-    note = 'Foto nueva pendiente de guardar.';
-  } else if (productImagesList.length > 0 && productImagesList[0]?.id) {
-    src = imgUrl(productImagesList[0].id);
-  }
-
-  if (!src) {
-    box.innerHTML = '<p class="muted" style="font-size:12px;">Sin foto principal seleccionada.</p>';
-    return;
-  }
-
-  box.innerHTML = `
-    <div style="position:relative; display:inline-block; border:1px solid #cbd5e1; border-radius:8px; padding:4px; background:#fff;">
-      <img src="${src}" alt="Foto principal" style="width:90px; height:90px; object-fit:cover; border-radius:6px; display:block;" />
-      <button type="button" id="removeMainPhotoBtn" aria-label="Quitar foto principal" style="position:absolute; top:2px; right:2px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.25);">✕</button>
-    </div>
-    ${note ? `<small class="muted" style="display:block; margin-top:4px;">${note}</small>` : ''}
-  `;
-  $('#removeMainPhotoBtn').addEventListener('click', removeMainPhoto);
-}
-
-async function removeMainPhoto() {
-  if (state.selectedFile) {
-    state.selectedFile = null;
-    $('#prodImageFile').value = '';
-    renderImagesSection();
-    return;
-  }
-
-  if (productImagesList.length === 0) return;
-  const firstId = productImagesList[0].id;
-  if (!confirm('¿Eliminar la foto principal del producto?')) return;
-
-  try {
-    await api(`/api/admin/image?id=${firstId}`, { method: 'DELETE' });
-  } catch (err) {
-    alert(err.message);
-    return;
-  }
-
-  productImagesList.shift(); // Remueve el elemento [0]
-  syncVariantsWithImages();
-  renderImagesSection();
-}
-
-/* --- Renderizado de Galería Adicional (Índices 1...) --- */
-function renderGallery() {
-  const container = $('#productImagesGallery');
-  if (!container) return;
-
-  const galleryImages = productImagesList.slice(1);
-
-  if (!galleryImages.length) {
-    container.innerHTML = '<p class="muted" style="font-size:12px;">No hay fotos adicionales en la galería.</p>';
-    return;
-  }
-
-  container.innerHTML = `
-    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;" id="dragGalleryContainer">
-      ${galleryImages.map((img, idx) => {
-        const actualIndex = idx + 1; // Posición real en el array unificado
-        return `
-          <div draggable="true" data-index="${actualIndex}" class="draggable-thumb" style="position:relative; width:85px; height:95px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#f8fafc; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
-            <button type="button" onclick="deleteGalleryImage(${img.id})" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
-            <img src="${imgUrl(img.id)}" alt="" style="width:100%; height:65px; object-fit:cover; border-radius:4px; pointer-events:none;" />
-            <span style="font-size:11px; color:#475569; font-weight:600;">#${actualIndex + 1}</span>
-          </div>
-        `;
-      }).join('')}
-    </div>
-    <small class="muted" style="display:block; margin-top:8px;">💡 Arrastrá las fotos adicionales para reordenarlas.</small>
-  `;
-  setupDragAndDrop();
-}
-
-function setupDragAndDrop() {
-  const container = $('#dragGalleryContainer');
-  if (!container) return;
-
-  let draggedIndex = null;
-
-  container.querySelectorAll('.draggable-thumb').forEach((item) => {
-    item.addEventListener('dragstart', (e) => {
-      draggedIndex = Number(item.dataset.index);
-      e.dataTransfer.effectAllowed = 'move';
-    });
-
-    item.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    });
-
-    item.addEventListener('drop', (e) => {
-      e.preventDefault();
-      const targetIndex = Number(item.dataset.index);
-      if (draggedIndex !== null && draggedIndex !== targetIndex) {
-        const moved = productImagesList.splice(draggedIndex, 1)[0];
-        productImagesList.splice(targetIndex, 0, moved);
-        draggedIndex = null;
-        renderImagesSection();
-      }
-    });
-  });
-}
-
-window.deleteGalleryImage = async function (imageId) {
-  if (!confirm('¿Eliminar esta foto de la galería?')) return;
-  try {
-    await api(`/api/admin/image?id=${imageId}`, { method: 'DELETE' });
-  } catch (err) {
-    alert(err.message);
-    return;
-  }
-
-  productImagesList = productImagesList.filter((img) => Number(img.id) !== Number(imageId));
-  syncVariantsWithImages();
-  renderImagesSection();
-};
-
-const addMoreImagesBtn = $('#addMoreImagesBtn');
-if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
-  addMoreImagesBtn.dataset.listener = 'true';
-  addMoreImagesBtn.addEventListener('change', async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-
-    const prodId = Number($('#prodId').value);
-    if (!prodId) {
-      alert('Primero debés guardar el producto antes de agregarle más fotos.');
-      e.target.value = '';
-      return;
-    }
-
-    for (const file of files) {
-      try {
-        const compressed = await compressImageFile(file);
-        const fd = new FormData();
-        fd.append('product_id', String(prodId));
-        fd.append('file', compressed, 'photo');
-        const res = await api('/api/admin/image', { method: 'POST', body: fd });
-        if (res && res.id) {
-          productImagesList.push({ id: Number(res.id) });
-        }
-      } catch (err) {
-        alert(`No se pudo subir una de las fotos: ${err.message}`);
-      }
-    }
-
-    e.target.value = '';
-    syncVariantsWithImages();
-    renderImagesSection();
-  });
-}
-
+/* --- Modal de producto --- */
 function openProductModal(prod = null) {
   state.editingProduct = prod;
   state.selectedFile = null;
@@ -524,7 +547,7 @@ function openProductModal(prod = null) {
   productVariants = variants;
 
   const ids = prod ? (prod.images ? prod.images.map((i) => i.id) : (prod.image_ids || [])) : [];
-  productImagesList = ids.map((id) => ({ id: Number(id) }));
+  productImagesList = ids.map((id) => ({ id }));
 
   renderImagesSection();
 
@@ -631,7 +654,7 @@ $('#prodImageFile').addEventListener('change', async (e) => {
   renderMainPreview();
 });
 
-/* ---------- SUBMIT ATÓMICO CON ARRAY UNIFICADO ---------- */
+/* ---------- SUBMIT ATÓMICO ---------- */
 $('#productForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('#productFormError').hidden = true;
@@ -667,7 +690,6 @@ $('#productForm').addEventListener('submit', async (e) => {
 
     let targetId = idVal;
 
-    // 1. Crear producto base si es nuevo
     if (!targetId) {
       const tempPayload = {
         name: $('#prodName').value.trim(),
@@ -686,7 +708,6 @@ $('#productForm').addEventListener('submit', async (e) => {
       $('#deleteProductBtn').hidden = false;
     }
 
-    // 2. Subir nueva foto principal pendiente e insertarla obligatoriamente en la posición [0]
     if (state.selectedFile && targetId) {
       const fd = new FormData();
       fd.append('product_id', String(targetId));
@@ -694,7 +715,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       try {
         const resImg = await api('/api/admin/image', { method: 'POST', body: fd });
         if (resImg && resImg.id) {
-          productImagesList.unshift({ id: Number(resImg.id) });
+          productImagesList.unshift({ id: resImg.id });
         }
       } catch (imgErr) {
         await refreshBootstrap();
@@ -702,8 +723,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       }
     }
 
-    // 3. Extraer el array final de IDs directamente desde el array unificado
-    const finalImageIds = productImagesList.map((img) => Number(img.id));
+    const finalImageIds = getImageIds();
 
     const payload = {
       id: targetId,
