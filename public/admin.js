@@ -1,13 +1,13 @@
 const state = { data: null, selectedFile: null, editingProduct: null };
 
-// Se usa una sola marca por carga de pagina para saltar la cache sin pedir cada foto de nuevo en cada dibujo
-const CACHE_STAMP = Date.now();
+// Marca de tiempo dinámica para evitar problemas de caché en navegadores
+const getCacheStamp = () => Date.now();
 
 const $ = (sel) => document.querySelector(sel);
 const dots = (n) => String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const fmtGs = (n) => dots(n) + ' Gs.';
 const digitsToInt = (v) => Number(String(v ?? '').replace(/\D/g, '')) || 0;
-const imgUrl = (id) => `/api/image/${id}?t=${CACHE_STAMP}`;
+const imgUrl = (id) => `/api/image/${id}?t=${getCacheStamp()}`;
 const nowSec = () => Math.floor(Date.now() / 1000);
 const fmtDate = (ts) =>
   new Date(ts * 1000).toLocaleString('es-PY', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -254,8 +254,8 @@ function populateFormOptions() {
 }
 
 let productVariants = [];
-let mainPhotoObj = null;       // Objeto independiente para la foto principal { id }
-let galleryImagesList = [];    // Array independiente exclusivo para la galería adicional
+let mainPhotoObj = null;       // Objeto independiente para la foto principal ({ id })
+let galleryImagesList = [];    // Array independiente exclusivo para fotos de galería adicional
 
 /* --- Colores / variantes --- */
 function renderVariantsForm(variants = productVariants) {
@@ -263,6 +263,7 @@ function renderVariantsForm(variants = productVariants) {
   const container = $('#productVariantsList');
   if (!container) return;
 
+  // Construir lista combinada de imágenes disponibles para asociar al color
   const allAvailableImages = [
     ...(mainPhotoObj ? [mainPhotoObj] : []),
     ...galleryImagesList
@@ -280,7 +281,7 @@ function renderVariantsForm(variants = productVariants) {
       <select data-variant-img="${index}" style="padding:6px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
         <option value="">📸 Foto por defecto</option>
         ${allAvailableImages.map((img, imgIdx) => `
-          <option value="${img.id}" ${Number(v.image_id) === Number(img.id) ? 'selected' : ''}>${imgIdx === 0 ? 'Foto Principal' : 'Foto #' + (imgIdx + 1)}</option>
+          <option value="${img.id}" ${Number(v.image_id) === Number(img.id) ? 'selected' : ''}>Foto #${imgIdx + 1}</option>
         `).join('')}
       </select>
 
@@ -319,7 +320,7 @@ if (addVariantBtn && !addVariantBtn.dataset.listener) {
   });
 }
 
-/* --- Foto principal independiente (con vista previa y boton ✕) --- */
+/* --- Foto principal independiente (con vista previa y botón ✕) --- */
 let mainPreviewUrl = null;
 
 function renderMainPreview() {
@@ -343,6 +344,7 @@ function renderMainPreview() {
 
   if (!src) {
     box.innerHTML = '<p class="muted" style="font-size:12px;">Sin foto principal seleccionada.</p>';
+    renderVariantsForm(productVariants);
     return;
   }
 
@@ -354,6 +356,7 @@ function renderMainPreview() {
     ${note ? `<small class="muted" style="display:block; margin-top:4px;">${note}</small>` : ''}
   `;
   $('#removeMainPhotoBtn').addEventListener('click', removeMainPhoto);
+  renderVariantsForm(productVariants);
 }
 
 async function removeMainPhoto() {
@@ -376,10 +379,9 @@ async function removeMainPhoto() {
 
   mainPhotoObj = null;
   renderMainPreview();
-  renderVariantsForm(productVariants);
 }
 
-/* --- Galería de fotos adicionales (Independiente) --- */
+/* --- Galería de fotos adicionales (Estrictamente independiente) --- */
 function renderGallery() {
   const container = $('#productImagesGallery');
   if (!container) return;
@@ -403,7 +405,6 @@ function renderGallery() {
   }
 
   renderMainPreview();
-  renderVariantsForm(productVariants);
 }
 
 function setupDragAndDrop() {
@@ -510,7 +511,7 @@ function openProductModal(prod = null) {
   productVariants = variants;
 
   const ids = prod ? (prod.images ? prod.images.map((i) => i.id) : (prod.image_ids || [])) : [];
-  mainPhotoObj = ids.length ? { id: ids[0] } : null;
+  mainPhotoObj = ids.length > 0 ? { id: ids[0] } : null;
   galleryImagesList = ids.slice(1).map((id) => ({ id }));
 
   renderGallery();
@@ -687,7 +688,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       }
     }
 
-    // Unir orden final enviando siempre [Principal, ...Galería]
+    // Consolidar el array final respetando [Principal, ...Galería Adicional]
     const finalImageIds = [
       ...(mainPhotoObj ? [mainPhotoObj.id] : []),
       ...galleryImagesList.map((img) => img.id)
