@@ -254,9 +254,9 @@ function populateFormOptions() {
 }
 
 /* ============================================================
-   ESTADO DE IMÁGENES SEPARADO (FOTO PRINCIPAL + GALERÍA ADICIONAL)
-   - mainPhotoId: ID único de la foto principal (o null)
-   - galleryImagesList: Array de IDs exclusivos para la galería
+   ESTADO DE IMÁGENES ESTRICTAMENTE SEPARADO
+   - mainPhotoId: ID único de la foto principal (independiente)
+   - galleryImagesList: Array de IDs exclusivo para la galería
    ============================================================ */
 let productVariants = [];
 let mainPhotoId = null;
@@ -286,7 +286,7 @@ function renderImagesSection() {
   renderVariantsForm(productVariants);
 }
 
-/* --- Foto principal independiente --- */
+/* --- Foto principal (TOTALMENTE AISLADA, SIN NÚMEROS NI INTERACCIÓN CON GALERÍA) --- */
 function renderMainPreview() {
   const box = $('#prodImagePreview');
   if (!box) return;
@@ -339,6 +339,7 @@ async function removeMainPhoto() {
     return;
   }
 
+  // AL BORRAR LA PRINCIPAL, QUEDA VACÍA. NUNCA TOCA LA GALERÍA.
   mainPhotoId = null;
   syncVariantsWithImages();
   renderImagesSection();
@@ -448,7 +449,7 @@ if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
   });
 }
 
-/* --- Variantes de Color (con "Foto por defecto" y fotos de galería numeradas) --- */
+/* --- Variantes de Color --- */
 function renderVariantsForm(variants = productVariants) {
   productVariants = variants;
   const container = $('#productVariantsList');
@@ -464,7 +465,7 @@ function renderVariantsForm(variants = productVariants) {
       <input type="text" value="${escapeHtml(v.name || '')}" placeholder="Ej: Marrón, Rosa..." data-variant-name="${index}" style="flex:1; min-width:110px; padding:6px 8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;" />
 
       <select data-variant-img="${index}" style="padding:6px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
-        <option value="">📸 Foto por defecto (Principal)</option>
+        <option value="">📸 Foto por defecto</option>
         ${galleryImagesList.map((id, gIdx) => `
           <option value="${id}" ${Number(v.image_id) === Number(id) ? 'selected' : ''}>Foto #${gIdx + 1}</option>
         `).join('')}
@@ -524,7 +525,6 @@ function openProductModal(prod = null) {
   }
   productVariants = variants;
 
-  // Cargar IDs separados: [0] es la principal, [1...] es la galería
   const ids = prod ? (prod.images ? prod.images.map((i) => i.id) : (prod.image_ids || [])) : [];
   mainPhotoId = ids.length > 0 ? ids[0] : null;
   galleryImagesList = ids.slice(1);
@@ -635,7 +635,7 @@ $('#prodImageFile').addEventListener('change', async (e) => {
   renderMainPreview();
 });
 
-/* ---------- SUBMIT ATÓMICO SEPARADO ---------- */
+/* ---------- SUBMIT ATÓMICO ---------- */
 $('#productForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('#productFormError').hidden = true;
@@ -689,7 +689,6 @@ $('#productForm').addEventListener('submit', async (e) => {
       $('#deleteProductBtn').hidden = false;
     }
 
-    // Subir foto principal nueva si existe
     if (state.selectedFile && targetId) {
       const fd = new FormData();
       fd.append('product_id', String(targetId));
@@ -705,7 +704,6 @@ $('#productForm').addEventListener('submit', async (e) => {
       }
     }
 
-    // Construcción final: [Foto Principal, ...Galería Adicional]
     const finalImageIds = [];
     if (mainPhotoId) finalImageIds.push(Number(mainPhotoId));
     for (const galId of galleryImagesList) {
