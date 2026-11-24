@@ -698,7 +698,10 @@ $('#productForm').addEventListener('submit', async (e) => {
     const tagIds = Array.from($('#prodTags').querySelectorAll('input[type="checkbox"]:checked'))
       .map((cb) => Number(cb.value));
 
-    const payload = {
+    // 1. Si el usuario seleccionó una nueva foto principal, la subimos primero para obtener su ID
+    let targetId = idVal;
+    
+    const initialPayload = {
       ...(idVal ? { id: idVal } : {}),
       name: $('#prodName').value.trim(),
       price_gs: price,
@@ -713,24 +716,54 @@ $('#productForm').addEventListener('submit', async (e) => {
 
     const saved = await api('/api/admin/products', {
       method: idVal ? 'PUT' : 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(initialPayload)
     });
 
-    const targetId = idVal || saved.id;
-    if (!idVal) { $('#prodId').value = String(saved.id); $('#deleteProductBtn').hidden = false; }
+    targetId = idVal || saved.id;
+    if (!idVal) { 
+      $('#prodId').value = String(targetId); 
+      $('#deleteProductBtn').hidden = false; 
+    }
 
+    // Si hay una nueva foto principal seleccionada, la subimos y la ponemos al inicio (posición #1)
     if (state.selectedFile && targetId) {
       const fd = new FormData();
       fd.append('product_id', String(targetId));
       fd.append('file', state.selectedFile, 'photo');
       try {
-        await api('/api/admin/image', { method: 'POST', body: fd });
+        const resImg = await api('/api/admin/image', { method: 'POST', body: fd });
+        if (resImg && resImg.id) {
+          // La colocamos al principio para que sea la foto principal (#1)
+          productImagesList.unshift({ id: resImg.id });
+        }
       } catch (imgErr) {
         await refreshBootstrap();
-        throw new Error(`El producto se guardó, pero la foto principal no se pudo subir: ${imgErr.message}. Volvé a presionar Guardar para reintentar.`);
+        throw new Error(`El producto se guardó, pero la foto principal no se pudo subir: ${imgErr.message}.`);
       }
     }
 
+    // 2. Enviamos el orden actual de la galería (image_ids) para que se guarde en la BD
+    const finalImageIds = productImagesList.map(img => img.id);
+    const updateOrderPayload = {
+      id: targetId,
+      name: $('#prodName').value.trim(),
+      price_gs: price,
+      offer_price_gs: offerPrice,
+      offer_ends_at: offerEnds,
+      category_id: $('#prodCategory').value ? Number($('#prodCategory').value) : null,
+      status: $('#prodStatus').value,
+      description: $('#prodDesc').value.trim(),
+      tag_ids: tagIds,
+      image_ids: finalImageIds, // Guarda el orden exacto de las fotos y cuál es la principal
+      colors: JSON.stringify(productVariants.map(v => ({ name: (v.name || '').trim(), image_id: v.image_id || null })))
+    };
+
+    await api('/api/admin/products', {
+      method: 'PUT',
+      body: JSON.stringify(updateOrderPayload)
+    });
+
+    state.selectedFile = null;
     $('#productModal').close();
     await refreshBootstrap();
   } catch (err) {
