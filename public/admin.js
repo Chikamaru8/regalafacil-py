@@ -367,39 +367,6 @@ function renderProductImagesGallery(images = []) {
   renderVariantsForm(productVariants);
 }
 
-// Configurar eventos de Arrastrar y Soltar con el Mouse
-function setupDragAndDrop() {
-  const container = $('#dragGalleryContainer');
-  if (!container) return;
-
-  let draggedIndex = null;
-
-  container.querySelectorAll('.draggable-thumb').forEach((item) => {
-    item.addEventListener('dragstart', (e) => {
-      draggedIndex = Number(e.target.dataset.index);
-      e.dataTransfer.effectAllowed = 'move';
-    });
-
-    item.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    });
-
-    item.addEventListener('drop', (e) => {
-      e.preventDefault();
-      const targetItem = e.target.closest('.draggable-thumb');
-      if (!targetItem) return;
-      const targetIndex = Number(targetItem.dataset.index);
-
-      if (draggedIndex !== null && draggedIndex !== targetIndex) {
-        const movedItem = productImagesList.splice(draggedIndex, 1)[0];
-        productImagesList.splice(targetIndex, 0, movedItem);
-        renderProductImagesGallery(productImagesList);
-      }
-    });
-  });
-}
-
 window.deleteProductImage = async function(imageId) {
   if (!confirm('¿Eliminar esta foto de la galería?')) return;
   try {
