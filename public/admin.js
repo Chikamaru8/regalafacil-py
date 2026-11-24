@@ -303,6 +303,35 @@ if (addVariantBtn && !addVariantBtn.dataset.listener) {
 }
 
 // Galería de fotos con reordenamiento y eliminación
+// function renderProductImagesGallery(images = []) {
+//   productImagesList = images;
+//   const container = $('#productImagesGallery');
+//   if (!container) return;
+
+//   if (!images.length) {
+//     container.innerHTML = '<p class="muted" style="font-size:12px;">No hay fotos cargadas todavía.</p>';
+//     renderVariantsForm(productVariants);
+//     return;
+//   }
+
+//   container.innerHTML = `
+//     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+//       ${images.map((img, index) => `
+//         <div style="position:relative; width:80px; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden; background:#f1f5f9; padding:4px; text-align:center;">
+//           <img src="/api/image/${img.id}" style="width:100%; height:60px; object-fit:cover; border-radius:4px;" />
+//           <button type="button" onclick="deleteProductImage(${img.id})" style="position:absolute; top:2px; right:2px; background:rgba(231,76,60,0.9); color:#fff; border:none; border-radius:50%; width:18px; height:18px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+//           <div style="display:flex; justify-content:space-between; margin-top:4px;">
+//             ${index > 0 ? `<button type="button" onclick="moveGalleryImage(${index}, -1)" style="font-size:10px; cursor:pointer; padding:1px 4px;">◀</button>` : '<span></span>'}
+//             ${index < images.length - 1 ? `<button type="button" onclick="moveGalleryImage(${index}, 1)" style="font-size:10px; cursor:pointer; padding:1px 4px;">▶</button>` : '<span></span>'}
+//           </div>
+//         </div>
+//       `).join('')}
+//     </div>
+//   `;
+//   renderVariantsForm(productVariants);
+// }
+
+// --- GALERÍA DE FOTOS CON DRAG & DROP Y ELIMINACIÓN ---
 function renderProductImagesGallery(images = []) {
   productImagesList = images;
   const container = $('#productImagesGallery');
@@ -315,21 +344,72 @@ function renderProductImagesGallery(images = []) {
   }
 
   container.innerHTML = `
-    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;" id="dragGalleryContainer">
       ${images.map((img, index) => `
-        <div style="position:relative; width:80px; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden; background:#f1f5f9; padding:4px; text-align:center;">
-          <img src="/api/image/${img.id}" style="width:100%; height:60px; object-fit:cover; border-radius:4px;" />
+        <div draggable="true" data-index="${index}" class="draggable-thumb" style="position:relative; width:80px; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden; background:#f1f5f9; padding:4px; text-align:center; cursor:grab;">
+          <img src="/api/image/${img.id}" style="width:100%; height:60px; object-fit:cover; border-radius:4px; pointer-events:none;" />
           <button type="button" onclick="deleteProductImage(${img.id})" style="position:absolute; top:2px; right:2px; background:rgba(231,76,60,0.9); color:#fff; border:none; border-radius:50%; width:18px; height:18px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
-          <div style="display:flex; justify-content:space-between; margin-top:4px;">
-            ${index > 0 ? `<button type="button" onclick="moveGalleryImage(${index}, -1)" style="font-size:10px; cursor:pointer; padding:1px 4px;">◀</button>` : '<span></span>'}
-            ${index < images.length - 1 ? `<button type="button" onclick="moveGalleryImage(${index}, 1)" style="font-size:10px; cursor:pointer; padding:1px 4px;">▶</button>` : '<span></span>'}
-          </div>
+          <div style="font-size:10px; color:#64748b; margin-top:3px;">#${index + 1}</div>
         </div>
       `).join('')}
     </div>
+    <small class="muted" style="display:block; margin-top:6px;">💡 Tip: Hacé clic sin soltar en una foto y arrastrala para cambiarla de orden.</small>
   `;
+
+  setupDragAndDrop();
   renderVariantsForm(productVariants);
 }
+
+// Configurar eventos de Arrastrar y Soltar con el Mouse
+function setupDragAndDrop() {
+  const container = $('#dragGalleryContainer');
+  if (!container) return;
+
+  let draggedIndex = null;
+
+  container.querySelectorAll('.draggable-thumb').forEach((item) => {
+    item.addEventListener('dragstart', (e) => {
+      draggedIndex = Number(e.target.dataset.index);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const targetItem = e.target.closest('.draggable-thumb');
+      if (!targetItem) return;
+      const targetIndex = Number(targetItem.dataset.index);
+
+      if (draggedIndex !== null && draggedIndex !== targetIndex) {
+        // Reordenar el array localmente
+        const movedItem = productImagesList.splice(draggedIndex, 1)[0];
+        productImagesList.splice(targetIndex, 0, movedItem);
+        
+        // Re-renderizar con el nuevo orden
+        renderProductImagesGallery(productImagesList);
+      }
+    });
+  });
+}
+
+window.deleteProductImage = async function(imageId) {
+  if (!confirm('¿Eliminar esta foto?')) return;
+  try {
+    await api(`/api/admin/image?id=${imageId}`, { method: 'DELETE' });
+    productImagesList = productImagesList.filter(img => img.id !== imageId);
+    renderProductImagesGallery(productImagesList);
+    if (state.editingProduct) {
+      state.editingProduct.image_ids = productImagesList.map(i => i.id);
+      renderProducts(state.data.products);
+    }
+  } catch (err) {
+    alert(err.message);
+  }
+};
 
 window.moveGalleryImage = function(index, direction) {
   const newIndex = index + direction;
