@@ -5,6 +5,7 @@ export async function onRequestGet({ env }) {
     { results: tags },
     { results: sellers },
     { results: products },
+    imgs,
     { results: leads }
   ] = await Promise.all([
     env.DB.prepare('SELECT key, value FROM settings').all(),
@@ -15,11 +16,11 @@ export async function onRequestGet({ env }) {
       SELECT p.id, p.slug, p.name, p.description, p.price_gs, p.category_id, p.status, p.attributes,
         (SELECT o.offer_price_gs FROM offer o WHERE o.product_id = p.id ORDER BY o.id DESC LIMIT 1) AS offer_price_gs,
         (SELECT o.ends_at FROM offer o WHERE o.product_id = p.id ORDER BY o.id DESC LIMIT 1) AS offer_ends_at,
-        (SELECT GROUP_CONCAT(pi.id) FROM product_image pi WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC) AS image_ids,
         (SELECT GROUP_CONCAT(pt.tag_id) FROM product_tag pt WHERE pt.product_id = p.id) AS tag_ids
       FROM product p
       ORDER BY p.id DESC
     `).all(),
+    env.DB.prepare('SELECT id, product_id, color_key FROM product_image ORDER BY product_id, sort_order, id').all(), // <-- ¡Aquí faltaba .all()!
     env.DB.prepare(`
       SELECT l.id, l.ref, l.status, l.customer_name, l.customer_phone, l.note, l.created_at,
         s.name AS seller_name
@@ -33,6 +34,16 @@ export async function onRequestGet({ env }) {
   const settings = {};
   for (const row of settingsRows) {
     try { settings[row.key] = JSON.parse(row.value); } catch { settings[row.key] = row.value; }
+  }
+
+  // Agrupar imágenes por producto para el admin
+  const imagesByProduct = {};
+  for (const img of (imgs.results || [])) {
+    if (!imagesByProduct[img.product_id]) imagesByProduct[img.product_id] = [];
+    imagesByProduct[img.product_id].push({
+      id: img.id,
+      color_key: img.color_key
+    });
   }
 
   const leadIds = leads.map(l => l.id);
@@ -52,12 +63,25 @@ export async function onRequestGet({ env }) {
     categories,
     tags,
     sellers,
-    products: products.map(p => ({
-      ...p,
-      attributes: JSON.parse(p.attributes || '{}'),
-      image_ids: p.image_ids ? p.image_ids.split(',').map(Number) : [],
-      tag_ids: p.tag_ids ? p.tag_ids.split(',').map(Number) : []
-    })),
+    products: products.map(p => {
+      let attrs = {};
+      try {
+        attrs = JSON.parse(p.attributes || '{}');
+      } catch {
+        attrs = {};
+      }
+
+      const productImages = imagesByProduct[p.id] || [];
+
+      return {
+        ...p,
+        attributes: attrs,
+        colors: attrs.colors || [],
+        images: productImages,
+        image_ids: productImages.map(img => img.id),
+        tag_ids: p.tag_ids ? p.tag_ids.split(',').map(Number) : []
+      };
+    }),
     leads: leads.map(l => ({ ...l, items: itemsByLead[l.id] || [] }))
   });
 }

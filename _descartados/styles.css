@@ -331,7 +331,9 @@ main {
 .ph img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* object-fit: cover; */
+  object-fit: contain;
+  background: #f8f9fa;
 }
 
 .badge {
@@ -528,7 +530,10 @@ dialog::backdrop {
 .gal img {
   width: 82%;
   aspect-ratio: 1 / 1;
-  object-fit: cover;
+  /* object-fit: cover; */
+  object-fit: contain;
+  background: #f8f9fa;
+
   border-radius: var(--r);
   scroll-snap-align: center;
   flex: none;

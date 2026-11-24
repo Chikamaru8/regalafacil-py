@@ -31,6 +31,7 @@ const S = {
   sug: null,
   cur: null,
   qty: 1,
+  selectedColor: null,
   g: { recipient: null, occasion: null, age: null, budget: null }
 };
 
@@ -166,18 +167,44 @@ dlg.addEventListener('click', e => {
 
 function productDlg(p) {
   const imgs = p.image_ids.length
-    ? `<div class="gal">${p.image_ids.map(i => `<img alt="${esc(p.name)}" src="/api/image/${i}">`).join('')}</div>`
+    ? `<div class="gal" id="productGallery">${p.image_ids.map(i => `<img alt="${esc(p.name)}" src="/api/image/${i}">`).join('')}</div>`
     : '';
-  const attrs = Object.entries(p.attributes || {}).map(([k, v]) => `<span>${esc(k)}: ${esc(v)}</span>`).join('');
+
+  // Obtener colores de forma segura
+  let colors = [];
+  try {
+    const attrsObj = typeof p.attributes === 'string' ? JSON.parse(p.attributes) : (p.attributes || {});
+    colors = attrsObj.colors || p.colors || [];
+  } catch {
+    colors = [];
+  }
+
+  const colorsHtml = colors.length ? `
+    <div style="margin:12px 0;">
+      <label style="font-size:12px; font-weight:600; color:var(--muted); display:block; margin-bottom:6px;">COLOR / VARIANTE DESEADA:</label>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        ${colors.map((c, idx) => `
+          <button type="button" class="chip${idx === 0 ? ' on' : ''}" data-act="selcolor" data-idx="${idx}" style="padding:6px 12px; font-size:13px;">
+            ${esc(c.name || c)}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  const otherAttrs = Object.entries(p.attributes || {}).filter(([k]) => k !== 'colors').map(([k, v]) => `<span>${esc(k)}: ${esc(v)}</span>`).join('');
   const old = onOffer(p) ? ` <s>${gs(p.price_gs)}</s>` : '';
+  
   S.cur = p.id;
   S.qty = 1;
+  S.selectedColor = colors.length ? (colors[0]?.name || colors[0]) : null;
 
   openDlg(`${hd(esc(p.name))}${imgs}
     <div class="pr" style="font-size:20px"><b>${gs(price(p))}</b>${old}</div>
     ${timeLeft(p) ? `<div class="left">${timeLeft(p)}</div>` : ''}
     <p style="margin:8px 0">${esc(p.description || '')}</p>
-    <div class="attrs">${attrs}</div>
+    ${colorsHtml}
+    <div class="attrs">${otherAttrs}</div>
     <div class="qty">
       <button data-act="dec" type="button">−</button>
       <span id="qv">1</span>
@@ -216,7 +243,7 @@ function cartDlg() {
   }
   const t = S.cart.reduce((s, i) => s + i.qty * i.price, 0);
   const rows = S.cart.map((i, k) => `<div class="ci">
-    <div>${esc(i.name)}<br><small>${gs(i.price)} c/u</small></div>
+    <div>${esc(i.name)}${i.color ? ` <small style="color:var(--muted)">(${esc(i.color)})</small>` : ''}<br><small>${gs(i.price)} c/u</small></div>
     <div class="qty">
       <button data-act="cdec" data-k="${k}" type="button">−</button>
       <span>${i.qty}</span>
@@ -255,12 +282,13 @@ function suggest() {
 }
 
 function addToCart(p, qty) {
-  const it = S.cart.find(i => i.id === p.id);
+  const color = S.selectedColor || null;
+  const it = S.cart.find(i => i.id === p.id && i.color === color);
   if (it) {
     it.qty += qty;
     it.price = price(p);
   } else {
-    S.cart.push({ id: p.id, name: p.name, price: price(p), qty });
+    S.cart.push({ id: p.id, name: p.name, price: price(p), qty, color });
   }
   ls.set('cart', S.cart);
   renderBar();
@@ -290,7 +318,7 @@ function sendOrder() {
   const biz = S.data.settings.business || {};
   const ref = mkref();
   const total = S.cart.reduce((s, i) => s + i.qty * i.price, 0);
-  const lines = S.cart.map(i => `• ${i.qty} x ${i.name} (${gs(i.price)})`).join('\n');
+  const lines = S.cart.map(i => `• ${i.qty} x ${i.name}${i.color ? ' [' + i.color + ']' : ''} (${gs(i.price)})`).join('\n');
   const msg = `Hola! Quiero consultar por este pedido en ${biz.name || 'RegaláFácil PY'}:\n${lines}\nTotal estimado: ${gs(total)}${name ? '\nNombre: ' + name : ''}\nRef: ${ref}`;
   const phone = String(seller?.phone || biz.default_phone || '').replace(/\D/g, '');
 
@@ -332,6 +360,34 @@ document.addEventListener('click', e => {
       e.stopPropagation();
       addToCart(byId(id), 1);
       break;
+    case 'selcolor': {
+      const idx = Number(el.dataset.idx);
+      const product = byId(S.cur);
+      let colors = [];
+      try {
+        const attrsObj = typeof product.attributes === 'string' ? JSON.parse(product.attributes) : (product.attributes || {});
+        colors = attrsObj.colors || product.colors || [];
+      } catch {}
+
+      if (colors[idx]) {
+        const selObj = colors[idx];
+        S.selectedColor = selObj.name || selObj;
+
+        // Actualizar diseño de botones de colores
+        el.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+        el.classList.add('on');
+
+        // Si la variante tiene imagen asociada, mostrarla dinámicamente en la galería
+        if (selObj.image_id || selObj.image_url) {
+          const gallery = $('#productGallery');
+          if (gallery) {
+            const imgUrl = selObj.image_url || `/api/image/${selObj.image_id}`;
+            gallery.innerHTML = `<img alt="${esc(product.name)}" src="${imgUrl}">`;
+          }
+        }
+      }
+      break;
+    }
     case 'rng':
       S.rng = el.dataset.v;
       S.sug = null;

@@ -77,7 +77,8 @@ function renderProducts() {
   }
 
   list.innerHTML = products.map((p) => {
-    const imgSrc = p.image_ids?.[0] ? `/api/image/${p.image_ids[0]}` : '';
+    const firstImgId = p.image_ids?.[0];
+    const imgSrc = firstImgId ? `/api/image/${firstImgId}` : '';
     const active = offerActive(p);
     const isActive = p.status === 'active';
     return `
@@ -116,7 +117,6 @@ function renderProducts() {
 }
 
 /* ---------- Pedidos ---------- */
-// Deben coincidir con los estados que acepta la base de datos
 const LEAD_LABELS = { new: 'Nuevo', chatting: 'Conversando', sold: 'Vendido', lost: 'Perdido' };
 
 function renderLeads() {
@@ -185,18 +185,183 @@ function populateFormOptions() {
   `).join('');
 }
 
+// --- GESTIÓN DE MÚLTIPLES FOTOS Y VARIANTES ---
+let productVariants = [];
+let productImagesList = [];
+
+// function renderVariantsForm(variants = []) {
+//   productVariants = variants;
+//   const container = $('#productVariantsList');
+//   if (!container) return;
+
+//   if (!variants.length) {
+//     container.innerHTML = '<p class="muted" style="font-size:12px;">Sin variantes de color añadidas.</p>';
+//     return;
+//   }
+
+//   container.innerHTML = variants.map((v, index) => `
+//     <div style="display:flex; gap:8px; align-items:center; background:#f8fafc; padding:8px; border-radius:8px; border:1px solid #e2e8f0;">
+//       <input type="text" value="${escapeHtml(v.name || '')}" placeholder="Ej: Celeste, Negro..." data-variant-name="${index}" style="flex:1; padding:6px 8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;" />
+//       <button type="button" class="btn btn-danger btn-sm" onclick="removeVariant(${index})" style="padding:4px 8px;">✕</button>
+//     </div>
+//   `).join('');
+
+//   container.querySelectorAll('[data-variant-name]').forEach(input => {
+//     input.addEventListener('input', (e) => {
+//       const idx = Number(e.target.dataset.variantName);
+//       if (productVariants[idx]) productVariants[idx].name = e.target.value.trim();
+//     });
+//   });
+// }
+
+function renderVariantsForm(variants = []) {
+  productVariants = variants;
+  const container = $('#productVariantsList');
+  if (!container) return;
+
+  if (!variants.length) {
+    container.innerHTML = '<p class="muted" style="font-size:12px;">Sin variantes de color añadidas.</p>';
+    return;
+  }
+
+  // Obtener las fotos actuales de la galería para que el admin pueda elegirlas
+  const availableImages = productImagesList || [];
+
+  container.innerHTML = variants.map((v, index) => `
+    <div style="display:flex; gap:6px; align-items:center; background:#f8fafc; padding:8px; border-radius:8px; border:1px solid #e2e8f0; flex-wrap:wrap;">
+      <input type="text" value="${escapeHtml(v.name || '')}" placeholder="Ej: Marrón, Rosa..." data-variant-name="${index}" style="flex:1; min-width:110px; padding:6px 8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;" />
+      
+      <select data-variant-img="${index}" style="padding:6px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
+        <option value="">📸 Foto por defecto</option>
+        ${availableImages.map(img => `
+          <option value="${img.id}" ${Number(v.image_id) === Number(img.id) ? 'selected' : ''}>Foto #${img.id}</option>
+        `).join('')}
+      </select>
+
+      <button type="button" class="btn btn-danger btn-sm" onclick="removeVariant(${index})" style="padding:4px 8px;">✕</button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('[data-variant-name]').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const idx = Number(e.target.dataset.variantName);
+      if (productVariants[idx]) productVariants[idx].name = e.target.value.trim();
+    });
+  });
+
+  container.querySelectorAll('[data-variant-img]').forEach(select => {
+    select.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.variantImg);
+      if (productVariants[idx]) {
+        productVariants[idx].image_id = e.target.value ? Number(e.target.value) : null;
+      }
+    });
+  });
+}
+
+window.removeVariant = function(index) {
+  productVariants.splice(index, 1);
+  renderVariantsForm(productVariants);
+};
+
+$('#addVariantBtn').addEventListener('click', () => {
+  productVariants.push({ name: '' });
+  renderVariantsForm(productVariants);
+});
+
+// Renderizar la galería de fotos múltiples del producto en el modal
+function renderProductImagesGallery(images = []) {
+  productImagesList = images;
+  const container = $('#productImagesGallery');
+  if (!container) return;
+
+  if (!images.length) {
+    container.innerHTML = '<p class="muted" style="font-size:12px;">No hay fotos cargadas todavía.</p>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      ${images.map((img) => `
+        <div style="position:relative; width:70px; height:70px; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden; background:#f1f5f9;">
+          <img src="/api/image/${img.id}" style="width:100%; height:100%; object-fit:cover;" />
+          <button type="button" onclick="deleteProductImage(${img.id})" style="position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+window.deleteProductImage = async function(imageId) {
+  if (!confirm('¿Eliminar esta foto?')) return;
+  try {
+    await api(`/api/admin/image?id=${imageId}`, { method: 'DELETE' });
+    productImagesList = productImagesList.filter(img => img.id !== imageId);
+    renderProductImagesGallery(productImagesList);
+    // Actualizar vista previa general si fuera necesario
+    if (state.editingProduct) {
+      state.editingProduct.image_ids = productImagesList.map(i => i.id);
+      renderProducts();
+    }
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
+$('#addMoreImagesBtn').addEventListener('change', async (e) => {
+  const files = e.target.files;
+  if (!files || !files.length) return;
+  const prodId = Number($('#prodId').value);
+  if (!prodId) {
+    alert('Primero debés guardar el producto antes de agregarle múltiples fotos.');
+    e.target.value = '';
+    return;
+  }
+
+  for (const file of files) {
+    try {
+      const compressed = await compressImageFile(file);
+      const fd = new FormData();
+      fd.append('product_id', String(prodId));
+      fd.append('file', compressed, 'photo');
+
+      const res = await api('/api/admin/image', { method: 'POST', body: fd });
+      if (res && res.id) {
+        productImagesList.push({ id: res.id });
+      }
+    } catch (err) {
+      alert(`No se pudo subir una de las fotos: ${err.message}`);
+    }
+  }
+
+  e.target.value = '';
+  renderProductImagesGallery(productImagesList);
+  await refreshBootstrap();
+});
+
 function openProductModal(prod = null) {
   state.editingProduct = prod;
   state.selectedFile = null;
   $('#prodImageFile').value = '';
   $('#productFormError').hidden = true;
 
+  // Cargar variantes limpiando espacios finales
+  try {
+    const parsedVariants = prod && prod.colors ? (typeof prod.colors === 'string' ? JSON.parse(prod.colors) : prod.colors) : [];
+    renderVariantsForm(parsedVariants.map(v => ({ name: (v.name || v).trim() })));
+  } catch {
+    renderVariantsForm([]);
+  }
+
+  // Cargar imágenes múltiples del producto
+  const prodImages = prod && prod.images ? prod.images : (prod && prod.image_ids ? prod.image_ids.map(id => ({ id })) : []);
+  renderProductImagesGallery(prodImages);
+
   if (prod) {
     $('#productModalTitle').textContent = 'Editar producto';
     $('#prodId').value = prod.id;
     $('#prodName').value = prod.name || '';
     $('#prodPrice').value = prod.price_gs || '';
-    // Una oferta vencida no se vuelve a cargar: guardar el producto la limpia.
     $('#prodOfferPrice').value = offerActive(prod) ? prod.offer_price_gs : '';
     $('#prodOfferEnds').value = offerActive(prod) ? toLocalInput(prod.offer_ends_at) : '';
     $('#prodCategory').value = prod.category_id || '';
@@ -219,6 +384,7 @@ function openProductModal(prod = null) {
     $('#prodStatus').value = 'active';
     $('#deleteProductBtn').hidden = true;
     $('#prodImagePreview').innerHTML = '';
+    renderProductImagesGallery([]);
   }
 
   $('#productModal').showModal();
@@ -317,6 +483,19 @@ $('#productForm').addEventListener('submit', async (e) => {
     const tagIds = Array.from($('#prodTags').querySelectorAll('input[type="checkbox"]:checked'))
       .map((cb) => Number(cb.value));
 
+    // const payload = {
+    //   ...(idVal ? { id: idVal } : {}),
+    //   name: $('#prodName').value.trim(),
+    //   price_gs: price,
+    //   offer_price_gs: offerPrice,
+    //   offer_ends_at: offerEnds,
+    //   category_id: $('#prodCategory').value ? Number($('#prodCategory').value) : null,
+    //   status: $('#prodStatus').value,
+    //   description: $('#prodDesc').value.trim(),
+    //   tag_ids: tagIds,
+    //   colors: JSON.stringify(productVariants.map(v => ({ name: (v.name || '').trim() })))
+    // };
+
     const payload = {
       ...(idVal ? { id: idVal } : {}),
       name: $('#prodName').value.trim(),
@@ -326,7 +505,8 @@ $('#productForm').addEventListener('submit', async (e) => {
       category_id: $('#prodCategory').value ? Number($('#prodCategory').value) : null,
       status: $('#prodStatus').value,
       description: $('#prodDesc').value.trim(),
-      tag_ids: tagIds
+      tag_ids: tagIds,
+      colors: JSON.stringify(productVariants.map(v => ({ name: (v.name || '').trim(), image_id: v.image_id || null })))
     };
 
     const saved = await api('/api/admin/products', {
@@ -335,7 +515,6 @@ $('#productForm').addEventListener('submit', async (e) => {
     });
 
     const targetId = idVal || saved.id;
-    // Si la foto falla, el reintento actualiza este mismo producto en vez de duplicarlo.
     if (!idVal) { $('#prodId').value = String(saved.id); $('#deleteProductBtn').hidden = false; }
 
     if (state.selectedFile && targetId) {
@@ -346,7 +525,7 @@ $('#productForm').addEventListener('submit', async (e) => {
         await api('/api/admin/image', { method: 'POST', body: fd });
       } catch (imgErr) {
         await refreshBootstrap();
-        throw new Error(`El producto se guardó, pero la foto no se pudo subir: ${imgErr.message}. Volvé a presionar Guardar para reintentar.`);
+        throw new Error(`El producto se guardó, pero la foto principal no se pudo subir: ${imgErr.message}. Volvé a presionar Guardar para reintentar.`);
       }
     }
 
@@ -383,7 +562,7 @@ document.querySelectorAll('.nav-item').forEach((btn) => {
   });
 });
 
-// Arranque: si ya hay sesión válida entra directo; si no, muestra el login
+// Arranque
 (async function init() {
   try {
     await showApp();

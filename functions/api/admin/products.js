@@ -11,6 +11,42 @@ function slugify(str) {
 const MAX_OFFER_SECONDS = 400 * 86400;
 
 // Valida y limpia lo que llega del panel. Devuelve { error } o { value }.
+// function clean(b) {
+//   if (!b || typeof b !== 'object') return { error: 'Datos inválidos' };
+//   const name = String(b.name || '').trim().slice(0, 120);
+//   const price = Math.round(Number(b.price_gs));
+//   if (!name || !Number.isFinite(price) || price <= 0) return { error: 'Nombre y precio válido son obligatorios' };
+
+//   const now = Math.floor(Date.now() / 1000);
+//   const offerPrice = Math.round(Number(b.offer_price_gs)) || 0;
+//   let offerEnds = null;
+//   if (offerPrice > 0) {
+//     if (offerPrice >= price) return { error: 'El precio de oferta debe ser menor al precio normal' };
+//     offerEnds = Math.floor(Number(b.offer_ends_at));
+//     if (!offerEnds) return { error: 'Indicá hasta cuándo vale la oferta' };
+//     if (offerEnds <= now) return { error: 'La fecha de fin de la oferta debe ser futura' };
+//     if (offerEnds > now + MAX_OFFER_SECONDS) return { error: 'La oferta no puede durar más de un año' };
+//   }
+
+//   const tagIds = Array.isArray(b.tag_ids)
+//     ? [...new Set(b.tag_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))]
+//     : [];
+
+//   return {
+//     value: {
+//       name,
+//       price,
+//       desc: String(b.description || '').trim().slice(0, 1000),
+//       catId: b.category_id ? Number(b.category_id) : null,
+//       status: b.status === 'paused' ? 'paused' : 'active',
+//       attrs: JSON.stringify(b.attributes && typeof b.attributes === 'object' ? b.attributes : {}),
+//       tagIds,
+//       offerPrice,
+//       offerEnds,
+//       now
+//     }
+//   };
+// }
 function clean(b) {
   if (!b || typeof b !== 'object') return { error: 'Datos inválidos' };
   const name = String(b.name || '').trim().slice(0, 120);
@@ -32,6 +68,21 @@ function clean(b) {
     ? [...new Set(b.tag_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))]
     : [];
 
+  // Procesar colores de forma segura: si viene vacío o sin elementos, guardamos un array vacío o null
+  let colorsParsed = [];
+  try {
+    if (typeof b.colors === 'string') {
+      colorsParsed = JSON.parse(b.colors);
+    } else if (Array.isArray(b.colors)) {
+      colorsParsed = b.colors;
+    }
+  } catch {
+    colorsParsed = [];
+  }
+  
+  // Filtramos para que solo guarde colores que tengan nombre real
+  const validColors = colorsParsed.filter(c => c && typeof c.name === 'string' && c.name.trim() !== '');
+
   return {
     value: {
       name,
@@ -39,7 +90,10 @@ function clean(b) {
       desc: String(b.description || '').trim().slice(0, 1000),
       catId: b.category_id ? Number(b.category_id) : null,
       status: b.status === 'paused' ? 'paused' : 'active',
-      attrs: JSON.stringify(b.attributes && typeof b.attributes === 'object' ? b.attributes : {}),
+      // Guardamos los colores estructurados dentro de attributes (o en la columna que corresponda en tu BD)
+      attrs: JSON.stringify({
+        colors: validColors.length > 0 ? validColors : []
+      }),
       tagIds,
       offerPrice,
       offerEnds,
