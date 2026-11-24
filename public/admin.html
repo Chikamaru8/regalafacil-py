@@ -157,26 +157,37 @@
         <div id="prodTags" class="chips-wrap"></div>
       </div>
 
-      <div class="field">
+      <!-- <div class="field">
         <span>Foto principal del producto (se comprime automáticamente)</span>
         <input type="file" id="prodImageFile" accept="image/*" />
         <div id="prodImagePreview" class="img-preview"></div>
+      </div> -->
+
+      <!-- FOTO PRINCIPAL INDEPENDIENTE -->
+      <div class="field">
+        <span>Foto principal del producto (se comprime automáticamente)</span>
+        <input type="file" id="prodImageFile" accept="image/*" />
+        <div id="prodImagePreview" class="img-preview" style="margin-top: 8px;"></div>
       </div>
 
-      <!-- ===================================================================== -->
-      <!-- GALERÍA DE MÚLTIPLES FOTOS -->
-      <!-- ===================================================================== -->
+      <!-- GALERÍA DE FOTOS ADICIONALES (EXCLUYE LA PRINCIPAL) -->
+      <!-- GALERÍA DE FOTOS ADICIONALES (EXCLUYE LA PRINCIPAL) -->
       <div class="field" style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-weight:600; font-size:14px;">Galería de fotos (hasta 8 fotos)</span>
+          <span style="font-weight:600; font-size:14px;">Galería de fotos adicionales (hasta 7 fotos)</span>
           <label class="btn btn-ghost btn-sm" style="cursor:pointer; margin:0;">
             + Agregar fotos
             <input type="file" id="addMoreImagesBtn" accept="image/*" multiple style="display:none;" />
           </label>
         </div>
-        <small class="muted" style="display:block; margin-bottom:8px;">Podés seleccionar varias fotos a la vez. Para productos nuevos, guardá el producto primero.</small>
+        <small class="muted" style="display:block; margin-bottom:8px;">Estas fotos acompañan a la principal en la vista del producto.</small>
         <div id="productImagesGallery"></div>
       </div>
+
+      <!-- ===================================================================== -->
+      <!-- GALERÍA DE MÚLTIPLES FOTOS -->
+      <!-- ===================================================================== -->
+      
 
       <!-- ===================================================================== -->
       <!-- VARIANTES DE COLOR -->
