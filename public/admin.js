@@ -79,7 +79,8 @@ function renderProducts(products = []) {
 
   list.innerHTML = products.map((p) => {
     const firstImgId = p.image_ids?.[0];
-    const imgSrc = firstImgId ? `/api/image/${firstImgId}` : '';
+    // const imgSrc = firstImgId ? `/api/image/${firstImgId}` : '';
+    const imgSrc = firstImgId ? `/api/image/${firstImgId}?t=${Date.now()}` : '';
     const active = offerActive(p);
     const isActive = p.status === 'active';
     return `
@@ -347,7 +348,8 @@ function renderProductImagesGallery(images = []) {
     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;" id="dragGalleryContainer">
       ${images.map((img, index) => `
         <div draggable="true" data-index="${index}" class="draggable-thumb" style="position:relative; width:80px; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden; background:#f1f5f9; padding:4px; text-align:center; cursor:grab;">
-          <img src="/api/image/${img.id}" style="width:100%; height:60px; object-fit:cover; border-radius:4px; pointer-events:none;" />
+          // <img src="/api/image/${img.id}" style="width:100%; height:60px; object-fit:cover; border-radius:4px; pointer-events:none;" />
+          <img src="/api/image/${img.id}?t=${Date.now()}" style="width:100%; height:60px; object-fit:cover; border-radius:4px; pointer-events:none;" />
           <button type="button" onclick="deleteProductImage(${img.id})" style="position:absolute; top:2px; right:2px; background:rgba(231,76,60,0.9); color:#fff; border:none; border-radius:50%; width:18px; height:18px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
           <div style="font-size:10px; color:#64748b; margin-top:3px;">#${index + 1}</div>
         </div>
@@ -542,9 +544,13 @@ function openProductModal(prod = null) {
       cb.checked = selectedTags.has(Number(cb.value));
     });
 
+    // $('#prodImagePreview').innerHTML = prod.image_ids?.[0]
+    //   ? `<img src="/api/image/${prod.image_ids[0]}" alt="Vista previa" />`
+    //   : '';
     $('#prodImagePreview').innerHTML = prod.image_ids?.[0]
-      ? `<img src="/api/image/${prod.image_ids[0]}" alt="Vista previa" />`
-      : '';
+  ? `<img src="/api/image/${prod.image_ids[0]}?t=${Date.now()}" alt="Vista previa" />`
+  : '';
+    
   } else {
     $('#productModalTitle').textContent = 'Nuevo producto';
     $('#productForm').reset();
