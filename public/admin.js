@@ -436,6 +436,42 @@ window.deleteProductImage = async function(imageId) {
   }
 };
 
+// const addMoreImagesBtn = $('#addMoreImagesBtn');
+// if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
+//   addMoreImagesBtn.dataset.listener = "true";
+//   addMoreImagesBtn.addEventListener('change', async (e) => {
+//     const files = e.target.files;
+//     if (!files || !files.length) return;
+//     const prodId = Number($('#prodId').value);
+//     if (!prodId) {
+//       alert('Primero debés guardar el producto antes de agregarle múltiples fotos.');
+//       e.target.value = '';
+//       return;
+//     }
+
+//     for (const file of files) {
+//       try {
+//         const compressed = await compressImageFile(file);
+//         const fd = new FormData();
+//         fd.append('product_id', String(prodId));
+//         fd.append('file', compressed, 'photo');
+
+//         const res = await api('/api/admin/image', { method: 'POST', body: fd });
+//         if (res && res.id) {
+//           productImagesList.push({ id: res.id });
+//         }
+//       } catch (err) {
+//         alert(`No se pudo subir una de las fotos: ${err.message}`);
+//       }
+//     }
+
+//     e.target.value = '';
+//     renderProductImagesGallery(productImagesList);
+//     await refreshBootstrap();
+//   });
+// }
+
+// ajuste forzar al selector de archivos a limpiarse correctamente cada vez que elijas una imagen nueva.
 const addMoreImagesBtn = $('#addMoreImagesBtn');
 if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
   addMoreImagesBtn.dataset.listener = "true";
@@ -465,11 +501,13 @@ if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
       }
     }
 
+    // CLAVE: Limpiamos el input file para evitar que se quede cacheado el archivo anterior
     e.target.value = '';
+    
     renderProductImagesGallery(productImagesList);
     await refreshBootstrap();
   });
-}
+} 
 
 function openProductModal(prod = null) {
   state.editingProduct = prod;
@@ -574,17 +612,38 @@ $('#logoutBtn').addEventListener('click', async () => {
 $('#newProductBtn').addEventListener('click', () => openProductModal(null));
 $('#closeModalBtn').addEventListener('click', () => $('#productModal').close());
 
+// $('#prodImageFile').addEventListener('change', async (e) => {
+//   const file = e.target.files?.[0];
+//   if (!file) { state.selectedFile = null; return; }
+//   try {
+//     const compressed = await compressImageFile(file);
+//     state.selectedFile = compressed;
+//     $('#prodImagePreview').innerHTML = `<img src="${URL.createObjectURL(compressed)}" alt="Vista previa" />`;
+//     $('#productFormError').hidden = true;
+//   } catch (err) {
+//     state.selectedFile = null;
+//     $('#prodImageFile').value = '';
+//     $('#productFormError').textContent = err.message || 'No se pudo leer la foto. Probá con otra.';
+//     $('#productFormError').hidden = false;
+//   }
+// });
+
 $('#prodImageFile').addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
-  if (!file) { state.selectedFile = null; return; }
+  if (!file) { 
+    state.selectedFile = null; 
+    return; 
+  }
   try {
     const compressed = await compressImageFile(file);
     state.selectedFile = compressed;
+    
+    // Mostramos la vista previa usando la URL del nuevo archivo comprimido
     $('#prodImagePreview').innerHTML = `<img src="${URL.createObjectURL(compressed)}" alt="Vista previa" />`;
     $('#productFormError').hidden = true;
   } catch (err) {
     state.selectedFile = null;
-    $('#prodImageFile').value = '';
+    $('#prodImageFile').value = ''; // Limpia el input si falla
     $('#productFormError').textContent = err.message || 'No se pudo leer la foto. Probá con otra.';
     $('#productFormError').hidden = false;
   }
