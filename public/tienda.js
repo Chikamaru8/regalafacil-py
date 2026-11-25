@@ -152,22 +152,33 @@ async function initCatalog() {
   document.title = BRAND_NAME;
   try {
     const res = await fetch(vslug ? `/api/catalog?v=${encodeURIComponent(vslug)}` : '/api/catalog');
-    if (!res.ok) throw new Error();
-    appData = await res.json();
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data && typeof data === 'object') {
+      appData = { ...appData, ...data };
+    }
   } catch (err) {
     console.error("Error conectando al backend D1:", err);
   }
 
-  const phoneNum = getPhone();
-  if (phoneNum) {
-    document.getElementById("topTel").textContent = `+${phoneNum.slice(0,3)} ${phoneNum.slice(3,6)} ${phoneNum.slice(6)}`;
-    document.getElementById("fabBtn").href = `https://wa.me/${phoneNum}?text=${encodeURIComponent('¡Hola! Tengo una consulta sobre ' + BRAND_NAME)}`;
-    document.getElementById("consultStockBtn").href = `https://wa.me/${phoneNum}?text=${encodeURIComponent('¡Hola! Estuve buscando un regalo en ' + BRAND_NAME + ' pero quiero consultar stock personalizado.')}`;
+  try {
+    const phoneNum = getPhone();
+    if (phoneNum) {
+      const topTel = document.getElementById("topTel");
+      if (topTel) topTel.textContent = `+${phoneNum.slice(0,3)} ${phoneNum.slice(3,6)} ${phoneNum.slice(6)}`;
+      const fabBtn = document.getElementById("fabBtn");
+      if (fabBtn) fabBtn.href = `https://wa.me/${phoneNum}?text=${encodeURIComponent('¡Hola! Tengo una consulta sobre ' + BRAND_NAME)}`;
+      const consultBtn = document.getElementById("consultStockBtn");
+      if (consultBtn) consultBtn.href = `https://wa.me/${phoneNum}?text=${encodeURIComponent('¡Hola! Estuve buscando un regalo en ' + BRAND_NAME + ' pero quiero consultar stock personalizado.')}`;
+    }
+  } catch (err) {
+    console.error("Error configurando contacto:", err);
   }
 
-  renderCategories();
-  renderCities();
-  renderProducts();
+  try { renderCategories(); } catch (err) { console.error(err); }
+  try { renderCities(); } catch (err) { console.error(err); }
+  try { renderProducts(); } catch (err) { console.error(err); }
+
   if (window.lucide && typeof lucide.createIcons === 'function') {
     lucide.createIcons();
   }
@@ -175,7 +186,7 @@ async function initCatalog() {
   // Abrir automaticamente si viene con parametro ?p=ID
   const urlParams = new URLSearchParams(location.search);
   const prodId = urlParams.get('p');
-  if (prodId && appData.products) {
+  if (prodId && Array.isArray(appData.products)) {
     const found = appData.products.find(x => String(x.id) === prodId);
     if (found) openProductModal(found.id);
   }
@@ -183,6 +194,7 @@ async function initCatalog() {
 
 function renderCategories() {
   const container = document.getElementById("categoryFilters");
+  if (!container) return;
   let html = `<button onclick="setCategoryFilter('', this)" class="cat-chip active shrink-0 px-3.5 py-2 rounded-2xl text-xs font-bold bg-brand-600 text-white shadow-sm shadow-brand-500/20 flex items-center gap-1.5 transition cursor-pointer"><span>🔥</span> Todo</button>`;
 
   (appData.categories || []).forEach(c => {
@@ -217,17 +229,19 @@ function renderProducts() {
   }
 
   const hasActiveFilter = state.search !== "" || state.categoryId !== "" || state.maxBudget > 0 || state.city !== "" || state.giftContext !== null;
-  resetMob.classList.toggle("hidden", !hasActiveFilter);
-  resetDesk.classList.toggle("hidden", !hasActiveFilter);
-  countLabel.textContent = `${list.length} ${list.length === 1 ? 'opción' : 'opciones'}`;
+  if (resetMob) resetMob.classList.toggle("hidden", !hasActiveFilter);
+  if (resetDesk) resetDesk.classList.toggle("hidden", !hasActiveFilter);
+  if (countLabel) countLabel.textContent = `${list.length} ${list.length === 1 ? 'opción' : 'opciones'}`;
 
   if (list.length === 0) {
-    grid.innerHTML = "";
-    emptyState.classList.remove("hidden");
+    if (grid) grid.innerHTML = "";
+    if (emptyState) emptyState.classList.remove("hidden");
     return;
   }
 
-  emptyState.classList.add("hidden");
+  if (emptyState) emptyState.classList.add("hidden");
+  if (!grid) return;
+
   grid.innerHTML = list.map((p, index) => {
     const price = getEffectivePrice(p);
     const hasOffer = p.offer_price_gs != null && price < Number(p.price_gs);
@@ -351,12 +365,10 @@ function openProductModal(id) {
   pendingRef = generateRef();
   const price = getEffectivePrice(p);
 
-  // Obtener la lista de imágenes (soporta tanto el formato nuevo como antiguo)
   const images = p.images || (p.image_ids ? p.image_ids.map(imgId => ({ id: imgId })) : []);
   currentActiveImageId = images.length ? images[0].id : null;
   updateModalImageDisplay();
 
-  // Renderizar la galería de miniaturas adicionales si hay más de una foto
   renderModalThumbnails(images);
 
   const catObj = (appData.categories || []).find(c => c.id === p.category_id);
@@ -458,7 +470,6 @@ function selectColor(col, btnEl) {
   updateModalWhatsappButton();
 }
 
-// El enlace usa siempre el mismo codigo (pendingRef) que se registra al tocar el boton
 function updateModalWhatsappButton() {
   if (!currentProduct) return;
   document.getElementById("modalWhatsappBtn").href =
@@ -530,7 +541,7 @@ function finishGiftAssistant(budget) {
   renderProducts();
 }
 
-// ---------- Regalito Bot (saludo inicial + consulta predeterminada) ----------
+// ---------- Regalito Bot (presentación + consulta en celular y PC) ----------
 let bubbleTimer = null;
 let typingTimer = null;
 let greetingSwitchTimer = null;
@@ -600,3 +611,13 @@ window.addEventListener("load", () => {
 window.addEventListener("scroll", () => {
   if (window.scrollY > 180) hideRegalitoBubble();
 }, { passive: true });
+
+document.addEventListener("DOMContentLoaded", () => {
+  const waBtn = document.getElementById("modalWhatsappBtn");
+  if (waBtn) {
+    waBtn.addEventListener("click", () => {
+      if (currentProduct && pendingRef) registerLead(pendingRef, currentProduct);
+    });
+  }
+  initCatalog();
+});
