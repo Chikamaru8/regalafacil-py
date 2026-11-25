@@ -151,6 +151,31 @@ export async function onRequestPut({ request, env }) {
   if (!res.meta?.changes) return Response.json({ error: 'Producto no encontrado' }, { status: 404 });
 
   await syncTagsAndOffer(env, id, v);
+
+  // Sincronizar orden de fotos (foto principal = sort_order 0) y eliminar fotos reemplazadas
+  if (Array.isArray(body?.image_ids)) {
+    const validIds = [...new Set(body.image_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+    const imgStmts = [];
+
+    if (validIds.length > 0) {
+      imgStmts.push(
+        env.DB.prepare(
+          `DELETE FROM product_image WHERE product_id = ? AND id NOT IN (${validIds.map(() => '?').join(',')})`
+        ).bind(id, ...validIds)
+      );
+      validIds.forEach((imgId, idx) => {
+        imgStmts.push(
+          env.DB.prepare('UPDATE product_image SET sort_order = ? WHERE id = ? AND product_id = ?')
+            .bind(idx, imgId, id)
+        );
+      });
+    } else {
+      imgStmts.push(env.DB.prepare('DELETE FROM product_image WHERE product_id = ?').bind(id));
+    }
+
+    await env.DB.batch(imgStmts);
+  }
+
   return Response.json({ ok: true, id });
 }
 
