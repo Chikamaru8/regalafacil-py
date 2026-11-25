@@ -4,7 +4,7 @@ let state = { search: "", categoryId: "", maxBudget: 0, city: "", sort: "feature
 let selectedColor = "";
 let currentProduct = null;
 let pendingRef = "";
-let currentActiveImageId = null; // Controla la foto activa mostrada en el modal
+let currentActiveImageId = null;
 
 const formatGs = amount => "Gs. " + Number(amount || 0).toLocaleString('es-PY');
 const IMG_VER = Date.now();
@@ -15,9 +15,6 @@ function normalizePhone(phone) {
   if (d.startsWith("0")) d = "595" + d.slice(1);
   return d;
 }
-
-const getPhone = () =>
-  normalizePhone(appData.seller?.phone || appData.settings.business?.default_phone || "595994354894");
 
 function getProductSeller(product) {
   const sellerId = product?.seller_id || product?.attributes?.seller_id;
@@ -59,7 +56,6 @@ if (vslug) {
   if (s && Date.now() - s.t < 30 * 864e5) vslug = s.slug;
 }
 
-// Identificador anonimo del visitante
 function getVisitorId() {
   let v = ls.get('visitor', '');
   if (!v) {
@@ -113,7 +109,11 @@ function buildWhatsAppUrl(product, price, ref) {
   }
 
   if (state.giftContext) {
-    message += `🎁 Ocasión: *${state.giftContext.recipient}* (${state.giftContext.occasion})\n`;
+    const parts = [];
+    if (state.giftContext.recipientLabel) parts.push(state.giftContext.recipientLabel);
+    if (state.giftContext.occasionLabel) parts.push(state.giftContext.occasionLabel);
+    if (state.giftContext.ageLabel) parts.push(state.giftContext.ageLabel);
+    if (parts.length) message += `🎁 Búsqueda: *${parts.join(" · ")}*\n`;
   }
 
   message += `\n🔗 Ver producto: ${productUrl}\n\n`;
@@ -122,7 +122,6 @@ function buildWhatsAppUrl(product, price, ref) {
   return `https://wa.me/${getProductPhone(product)}?text=${encodeURIComponent(message)}`;
 }
 
-// El servidor toma nombre, precio y vendedor de la base: aqui solo van ids y cantidad
 function registerLead(ref, product) {
   try {
     const owner = getProductSeller(product);
@@ -163,7 +162,7 @@ function renderCities() {
   }
 
   const cities = Array.from(citiesMap.values()).sort((a, b) => a.localeCompare(b, 'es'));
-  select.innerHTML = `<option value="">Ciudad: Todas</option>` +
+  select.innerHTML = `<option value="">Todas las ciudades</option>` +
     cities.map(city => `<option value="${esc(city)}">${esc(city)}</option>`).join("");
   select.value = state.city || "";
 }
@@ -184,19 +183,6 @@ async function initCatalog() {
     }
   } catch (err) {
     console.error("Error conectando al backend D1:", err);
-  }
-
-  try {
-    const phoneNum = getPhone();
-    if (phoneNum) {
-
-      const fabBtn = document.getElementById("fabBtn");
-      if (fabBtn) fabBtn.href = `https://wa.me/${phoneNum}?text=${encodeURIComponent('¡Hola! Tengo una consulta sobre ' + BRAND_NAME)}`;
-      const consultBtn = document.getElementById("consultStockBtn");
-      if (consultBtn) consultBtn.href = `https://wa.me/${phoneNum}?text=${encodeURIComponent('¡Hola! Estuve buscando un regalo en ' + BRAND_NAME + ' pero quiero consultar stock personalizado.')}`;
-    }
-  } catch (err) {
-    console.error("Error configurando contacto:", err);
   }
 
   try { renderCategories(); } catch (err) { console.error(err); }
@@ -220,7 +206,6 @@ function renderCategories() {
   const container = document.getElementById("categoryFilters");
   if (!container) return;
 
-  // Solo mostrar categorías que tengan al menos un producto disponible
   const activeCatIds = new Set(
     (appData.products || [])
       .map(p => p.category_id)
@@ -239,6 +224,22 @@ function renderCategories() {
   container.innerHTML = html;
 }
 
+function matchesGiftTags(product, giftContext) {
+  if (!giftContext) return true;
+  const selectedTagIds = [
+    giftContext.recipientTagId,
+    giftContext.occasionTagId,
+    giftContext.ageTagId
+  ].filter(id => id != null && id !== "").map(Number);
+
+  if (!selectedTagIds.length) return true;
+
+  const prodTagIds = Array.isArray(product.tag_ids) ? product.tag_ids.map(Number) : [];
+  if (!prodTagIds.length) return false;
+
+  return selectedTagIds.every(tagId => prodTagIds.includes(tagId));
+}
+
 function renderProducts() {
   const grid = document.getElementById("productGrid");
   const emptyState = document.getElementById("emptyState");
@@ -247,13 +248,14 @@ function renderProducts() {
   const resetDesk = document.getElementById("resetHeaderBtnDesktop");
 
   let list = (appData.products || []).filter(p => {
-    const matchesSearch = state.search === "" || (p.name + ' ' + (p.description || '')).toLowerCase().includes(state.search);
+    const matchesSearch = state.search === "" || (p.name + ' ' + (p.description || '') + ' ' + (p.attributes?.short_detail || '')).toLowerCase().includes(state.search);
     const matchesCat = state.categoryId === "" || String(p.category_id) === String(state.categoryId);
     const price = getEffectivePrice(p);
     const matchesBudget = state.maxBudget === 0 || price <= state.maxBudget;
     const prodCity = String(p?.attributes?.city || '').trim().toLowerCase();
     const matchesCity = state.city === "" || prodCity === state.city.toLowerCase();
-    return matchesSearch && matchesCat && matchesBudget && matchesCity;
+    const matchesGift = matchesGiftTags(p, state.giftContext);
+    return matchesSearch && matchesCat && matchesBudget && matchesCity && matchesGift;
   });
 
   if (state.sort === "price_asc") {
@@ -355,7 +357,9 @@ function setBudgetFilter(max, btnEl) {
   document.querySelectorAll(".budget-chip").forEach(btn => {
     btn.className = "budget-chip shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:border-slate-300 transition cursor-pointer";
   });
-  btnEl.className = "budget-chip active shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 text-white shadow-sm transition cursor-pointer";
+  if (btnEl) {
+    btnEl.className = "budget-chip active shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 text-white shadow-sm transition cursor-pointer";
+  }
   document.getElementById("budgetLabel").textContent = max === 0 ? "Todos los precios" : `Hasta ${formatGs(max)}`;
   renderProducts();
 }
@@ -365,7 +369,9 @@ function setCategoryFilter(catId, btnEl) {
   document.querySelectorAll(".cat-chip").forEach(btn => {
     btn.className = "cat-chip shrink-0 px-3.5 py-2 rounded-2xl text-xs font-semibold bg-white text-slate-700 border border-slate-200/90 hover:border-slate-300 flex items-center gap-1.5 transition cursor-pointer";
   });
-  btnEl.className = "cat-chip active shrink-0 px-3.5 py-2 rounded-2xl text-xs font-bold bg-brand-600 text-white shadow-sm shadow-brand-500/20 flex items-center gap-1.5 transition cursor-pointer";
+  if (btnEl) {
+    btnEl.className = "cat-chip active shrink-0 px-3.5 py-2 rounded-2xl text-xs font-bold bg-brand-600 text-white shadow-sm shadow-brand-500/20 flex items-center gap-1.5 transition cursor-pointer";
+  }
   document.getElementById("catalogTitle").textContent = catId === "" ? "Catálogo" : "Filtrado por categoría";
   renderProducts();
 }
@@ -415,7 +421,6 @@ function openProductModal(id) {
   document.getElementById("modalPrice").textContent = formatGs(price);
 
   syncSelectedVariantByImage(currentActiveImageId);
-
   updateModalWhatsappButton();
 
   const highlights = Array.isArray(p.attributes?.highlights) ? p.attributes.highlights.filter(Boolean) : [];
@@ -497,15 +502,6 @@ window.setActiveImage = function(imgId) {
   }
 };
 
-function selectColor(col, btnEl) {
-  selectedColor = col;
-  document.querySelectorAll(".color-btn").forEach(b => {
-    b.className = "color-btn px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-700 transition cursor-pointer";
-  });
-  btnEl.className = "color-btn px-3 py-1.5 rounded-xl text-xs font-semibold border border-brand-600 bg-brand-50 text-brand-700 transition cursor-pointer";
-  updateModalWhatsappButton();
-}
-
 function updateModalWhatsappButton() {
   if (!currentProduct) return;
   document.getElementById("modalWhatsappBtn").href =
@@ -517,10 +513,140 @@ function closeProductModal() {
   document.body.style.overflow = "";
 }
 
-let wizardData = { recipient: "", occasion: "", budget: 0 };
+// ---------- Asistente de Regalos conectado a etiquetas (Para quién / Ocasión / Edad) ----------
+let wizardData = {
+  recipientTagId: null,
+  recipientLabel: "",
+  occasionTagId: null,
+  occasionLabel: "",
+  ageTagId: null,
+  ageLabel: "",
+  budget: 0
+};
+
+function classifyTagGroup(tag) {
+  const rawGroup = String(tag?.group || tag?.kind || tag?.type || tag?.category || "").toLowerCase();
+  if (rawGroup.includes("recip") || rawGroup.includes("quien") || rawGroup.includes("who") || rawGroup.includes("person")) return "recipient";
+  if (rawGroup.includes("occas") || rawGroup.includes("ocasion") || rawGroup.includes("event")) return "occasion";
+  if (rawGroup.includes("age") || rawGroup.includes("edad")) return "age";
+
+  const label = String(tag?.label || tag?.name || "").toLowerCase().trim();
+  if (["cumpleaños", "cumpleanos", "navidad", "aniversario"].includes(label)) return "occasion";
+  if (["joven", "adulto", "adulto mayor"].includes(label)) return "age";
+  return "recipient";
+}
+
+function findTagIdByLabel(targetLabel) {
+  const clean = String(targetLabel || "").toLowerCase().trim();
+  if (!clean) return null;
+  const found = (appData.tags || []).find(
+    t => String(t?.label || t?.name || "").toLowerCase().trim() === clean
+  );
+  return found ? Number(found.id) : null;
+}
+
+function renderWizardTagOptions() {
+  const allTags = appData.tags || [];
+  const recipientTags = allTags.filter(t => classifyTagGroup(t) === "recipient");
+  const occasionTags = allTags.filter(t => classifyTagGroup(t) === "occasion");
+  const ageTags = allTags.filter(t => classifyTagGroup(t) === "age");
+
+  const exactRecipients = [
+    { emoji: "👩", label: "Mamá" },
+    { emoji: "👨", label: "Papá" },
+    { emoji: "❤️", label: "Pareja" },
+    { emoji: "🤝", label: "Amigo/a" },
+    { emoji: "🧸", label: "Niño/a" }
+  ].map(item => ({
+    id: findTagIdByLabel(item.label),
+    label: item.label,
+    display: `${item.emoji} ${item.label}`
+  }));
+
+  const exactOccasions = [
+    { emoji: "🎂", label: "Cumpleaños" },
+    { emoji: "🎄", label: "Navidad" },
+    { emoji: "💖", label: "Aniversario" }
+  ].map(item => ({
+    id: findTagIdByLabel(item.label),
+    label: item.label,
+    display: `${item.emoji} ${item.label}`
+  }));
+
+  const exactAges = [
+    { emoji: "🧑", label: "Joven" },
+    { emoji: "🧔", label: "Adulto" },
+    { emoji: "👵", label: "Adulto mayor" }
+  ].map(item => ({
+    id: findTagIdByLabel(item.label),
+    label: item.label,
+    display: `${item.emoji} ${item.label}`
+  }));
+
+  const recSource = recipientTags.length
+    ? recipientTags.map(t => ({ id: Number(t.id), label: t.label, display: t.label }))
+    : exactRecipients;
+
+  const occSource = occasionTags.length
+    ? occasionTags.map(t => ({ id: Number(t.id), label: t.label, display: t.label }))
+    : exactOccasions;
+
+  const ageSource = ageTags.length
+    ? ageTags.map(t => ({ id: Number(t.id), label: t.label, display: t.label }))
+    : exactAges;
+
+  const recBox = document.getElementById("wizardRecipientOptions");
+  if (recBox) {
+    recBox.innerHTML =
+      recSource.map(t => `
+        <button type="button" onclick="selectRecipientTag(${t.id === null ? 'null' : t.id}, '${esc(t.label)}')" class="p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition active:scale-95 cursor-pointer">
+          <span class="font-display font-bold text-xs sm:text-sm text-slate-800 block">${esc(t.display)}</span>
+        </button>
+      `).join("") +
+      `<button type="button" onclick="selectRecipientTag(null, '')" class="col-span-2 p-3 rounded-2xl border border-dashed border-slate-300 hover:border-brand-500 bg-white text-center text-xs font-semibold text-slate-600 transition cursor-pointer">
+        Cualquiera / Saltar este paso →
+      </button>`;
+  }
+
+  const occBox = document.getElementById("wizardOccasionOptions");
+  if (occBox) {
+    occBox.innerHTML =
+      occSource.map(t => `
+        <button type="button" onclick="selectOccasionTag(${t.id === null ? 'null' : t.id}, '${esc(t.label)}')" class="w-full p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex items-center justify-between active:scale-[0.98] cursor-pointer">
+          <span class="font-display font-bold text-xs sm:text-sm text-slate-800">${esc(t.display)}</span>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+        </button>
+      `).join("") +
+      `<button type="button" onclick="selectOccasionTag(null, '')" class="w-full p-3 rounded-2xl border border-dashed border-slate-300 hover:border-brand-500 bg-white text-center text-xs font-semibold text-slate-600 transition cursor-pointer">
+        Cualquier ocasión / Saltar este paso →
+      </button>`;
+  }
+
+  const ageBox = document.getElementById("wizardAgeOptions");
+  if (ageBox) {
+    ageBox.innerHTML =
+      ageSource.map(t => `
+        <button type="button" onclick="selectAgeTag(${t.id === null ? 'null' : t.id}, '${esc(t.label)}')" class="p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition active:scale-95 cursor-pointer">
+          <span class="font-display font-bold text-xs sm:text-sm text-slate-800 block">${esc(t.display)}</span>
+        </button>
+      `).join("") +
+      `<button type="button" onclick="selectAgeTag(null, '')" class="col-span-2 p-3 rounded-2xl border border-dashed border-slate-300 hover:border-brand-500 bg-white text-center text-xs font-semibold text-slate-600 transition cursor-pointer">
+        Cualquier edad / Saltar este paso →
+      </button>`;
+  }
+}
 
 function openGiftAssistant() {
-  wizardData = { recipient: "", occasion: "", budget: 0 };
+  wizardData = {
+    recipientTagId: null,
+    recipientLabel: "",
+    occasionTagId: null,
+    occasionLabel: "",
+    ageTagId: null,
+    ageLabel: "",
+    budget: 0
+  };
+  renderWizardTagOptions();
   goToWizardStep(1);
   document.getElementById("giftModal").classList.remove("hidden");
   document.body.style.overflow = "hidden";
@@ -538,39 +664,52 @@ function goToWizardStep(step) {
   document.getElementById("wizardStep1").classList.toggle("hidden", step !== 1);
   document.getElementById("wizardStep2").classList.toggle("hidden", step !== 2);
   document.getElementById("wizardStep3").classList.toggle("hidden", step !== 3);
-  document.getElementById("stepIndicator").textContent = `Paso ${step} de 3`;
-  document.getElementById("wizardProgress").style.width = `${(step / 3) * 100}%`;
+  document.getElementById("wizardStep4").classList.toggle("hidden", step !== 4);
+  document.getElementById("stepIndicator").textContent = `Paso ${step} de 4`;
+  document.getElementById("wizardProgress").style.width = `${(step / 4) * 100}%`;
   if (window.lucide && typeof lucide.createIcons === 'function') {
     lucide.createIcons();
   }
 }
 
-function selectRecipient(rec) {
-  wizardData.recipient = rec;
+function selectRecipientTag(tagId, label) {
+  wizardData.recipientTagId = tagId;
+  wizardData.recipientLabel = label || "";
   goToWizardStep(2);
 }
 
-function selectOccasion(occ) {
-  wizardData.occasion = occ;
+function selectOccasionTag(tagId, label) {
+  wizardData.occasionTagId = tagId;
+  wizardData.occasionLabel = label || "";
   goToWizardStep(3);
 }
 
+function selectAgeTag(tagId, label) {
+  wizardData.ageTagId = tagId;
+  wizardData.ageLabel = label || "";
+  goToWizardStep(4);
+}
+
 function finishGiftAssistant(budget) {
-  wizardData.budget = budget;
+  wizardData.budget = Number(budget) || 0;
   closeGiftAssistant();
 
   state.search = "";
   state.categoryId = "";
-  state.maxBudget = budget;
+  state.maxBudget = wizardData.budget;
   state.giftContext = { ...wizardData };
 
   document.getElementById("searchInput").value = "";
   document.getElementById("clearSearchBtn").classList.add("hidden");
+  document.getElementById("budgetLabel").textContent = state.maxBudget === 0 ? "Todos los precios" : `Hasta ${formatGs(state.maxBudget)}`;
 
-  const bText = budget > 200000 ? "presupuesto libre" : `hasta ${formatGs(budget)}`;
-  document.getElementById("assistantSummaryText").innerHTML =
-    `Regalo para <strong>${esc(wizardData.recipient)}</strong> · Ocasión: <strong>${esc(wizardData.occasion)}</strong> · Presupuesto: <strong>${bText}</strong>`;
+  const summaryParts = [];
+  if (wizardData.recipientLabel) summaryParts.push(`Para: <strong>${esc(wizardData.recipientLabel)}</strong>`);
+  if (wizardData.occasionLabel) summaryParts.push(`Ocasión: <strong>${esc(wizardData.occasionLabel)}</strong>`);
+  if (wizardData.ageLabel) summaryParts.push(`Edad: <strong>${esc(wizardData.ageLabel)}</strong>`);
+  summaryParts.push(`Presupuesto: <strong>${state.maxBudget === 0 ? 'Sin límite' : 'Hasta ' + formatGs(state.maxBudget)}</strong>`);
 
+  document.getElementById("assistantSummaryText").innerHTML = summaryParts.join(" · ");
   document.getElementById("assistantResultBanner").classList.remove("hidden");
   document.getElementById("catalogTitle").textContent = "🎁 Ideas recomendadas";
 
