@@ -45,7 +45,7 @@
       }
     }
   </script>
-<style>
+  <style>
     body { background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -96,20 +96,31 @@
             Ver todo
           </button>
 
-          <!-- REGALITO BOT MÓVIL (ARRIBA A LA DERECHA, SIEMPRE VISIBLE) -->
-          <button
-            type="button"
-            onclick="openGiftAssistant()"
-            aria-label="Abrir asistente de regalos"
-            title="¿Te ayudo a elegir un regalo?"
-            class="md:hidden relative w-14 h-14 flex items-center justify-center focus:outline-none cursor-pointer transition transform active:scale-95 shrink-0"
-          >
-            <img
-              src="regalito.png"
-              alt="Regalito Bot"
-              class="w-full h-full object-contain drop-shadow-md animate-float-bot pointer-events-none"
+          <!-- REGALITO BOT MÓVIL (ARRIBA A LA DERECHA, GRANDE Y CON GLOBO DE DIÁLOGO) -->
+          <div class="md:hidden relative flex items-center">
+            <div
+              id="regalitoBubbleMobile"
+              onclick="openGiftAssistant()"
+              class="hidden absolute right-[4.4rem] top-1/2 -translate-y-1/2 w-44 max-w-[48vw] bg-white text-slate-800 text-[11px] font-semibold leading-snug px-3 py-2 rounded-2xl rounded-br-sm shadow-xl border border-slate-200 cursor-pointer animate-pop z-40"
             >
-          </button>
+              <span>¡Hola! Soy Regalito 🤖🎁</span>
+              <span class="absolute top-1/2 -translate-y-1/2 -right-1.5 w-3 h-3 bg-white border-t border-r border-slate-200 rotate-45"></span>
+            </div>
+
+            <button
+              type="button"
+              onclick="openGiftAssistant()"
+              aria-label="Abrir asistente de regalos"
+              title="¡Hola! Soy Regalito"
+              class="relative w-16 h-16 flex items-center justify-center focus:outline-none cursor-pointer transition transform active:scale-95 shrink-0"
+            >
+              <img
+                src="regalito.png"
+                alt="Regalito Bot"
+                class="w-full h-full object-contain drop-shadow-lg animate-float-bot pointer-events-none"
+              >
+            </button>
+          </div>
         </div>
       </div>
 
@@ -245,7 +256,7 @@
   </div>
 
   <!-- BOTÓN FLOTANTE WHATSAPP (ESQUINA INFERIOR IZQUIERDA) -->
-  <div class="fixed bottom-5 left-4 z-30">
+  <div class="fixed bottom-5 left-4 sm:left-6 z-30">
     <a 
       id="fabBtn"
       href="#" 
@@ -260,29 +271,30 @@
   </div>
 
   <!-- REGALITO BOT ESCRITORIO (ESQUINA INFERIOR DERECHA CON GLOBO DE DIÁLOGO) -->
-  <div class="md:hidden relative flex items-center">
-            <div
-              id="regalitoBubbleMobile"
-              onclick="openGiftAssistant()"
-              class="hidden absolute right-16 top-1/2 -translate-y-1/2 w-48 bg-white text-slate-800 text-[11px] font-semibold leading-snug px-3 py-2 rounded-2xl rounded-br-none shadow-xl border border-slate-200 cursor-pointer animate-pop z-40"
-            >
-              <span>¡Hola! Soy Regalito 🤖🎁</span>
-            </div>
+  <div class="hidden md:flex fixed bottom-4 right-6 z-30 flex-col items-end gap-2">
+    <div
+      id="regalitoBubble"
+      onclick="openGiftAssistant()"
+      class="hidden relative max-w-[220px] bg-white text-slate-800 text-xs font-semibold leading-snug px-3.5 py-2.5 rounded-2xl rounded-br-sm shadow-xl border border-slate-200/90 cursor-pointer animate-pop"
+    >
+      <span>¡Hola! Soy Regalito 🤖🎁</span>
+      <span class="absolute -bottom-1.5 right-5 w-3 h-3 bg-white border-r border-b border-slate-200/90 rotate-45"></span>
+    </div>
 
-            <button
-              type="button"
-              onclick="openGiftAssistant()"
-              aria-label="Abrir asistente de regalos"
-              title="¡Hola! Soy Regalito"
-              class="relative w-16 h-16 flex items-center justify-center focus:outline-none cursor-pointer transition transform active:scale-95 shrink-0"
-            >
-              <img
-                src="regalito.png"
-                alt="Regalito Bot"
-                class="w-full h-full object-contain drop-shadow-lg animate-float-bot pointer-events-none"
-              >
-            </button>
-          </div>
+    <button
+      type="button"
+      onclick="openGiftAssistant()"
+      aria-label="Abrir asistente de regalos"
+      title="¡Hola! Soy Regalito"
+      class="group relative w-24 h-24 flex items-center justify-center focus:outline-none cursor-pointer transition transform hover:scale-105 active:scale-95"
+    >
+      <img
+        src="regalito.png"
+        alt="Regalito Bot"
+        class="w-full h-full object-contain drop-shadow-xl animate-float-bot pointer-events-none"
+      >
+    </button>
+  </div>
 
   <!-- ===================================================================== -->
   <!-- MODAL 1: FICHA DE PRODUCTO CON SELECTOR DE COLOR Y LINK DIRECTO -->
@@ -473,6 +485,6 @@
   <!-- ===================================================================== -->
   <!-- SCRIPT -->
   <!-- ===================================================================== -->
-  <script src='tienda.js'></script>
+  <script src="tienda.js"></script>
 </body>
 </html>
