@@ -496,4 +496,31 @@ document.addEventListener("DOMContentLoaded", () => {
     if (currentProduct && pendingRef) registerLead(pendingRef, currentProduct);
   });
   initCatalog();
+  // ---------- Regalito Bot (globo inteligente) ----------
+let bubbleTimer = null;
+
+function showRegalitoBubble() {
+  const bubble = document.getElementById("regalitoBubble");
+  if (!bubble) return;
+  bubble.classList.remove("hidden");
+
+  // Se oculta solo después de 8 segundos para no estorbar
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(hideRegalitoBubble, 8000);
+}
+
+function hideRegalitoBubble() {
+  const bubble = document.getElementById("regalitoBubble");
+  if (bubble) bubble.classList.add("hidden");
+  clearTimeout(bubbleTimer);
+}
+
+// Aparece 1.5s después de cargar y se oculta si el usuario baja mucho por el catálogo
+window.addEventListener("load", () => {
+  setTimeout(showRegalitoBubble, 1500);
+});
+
+window.addEventListener("scroll", () => {
+  if (window.scrollY > 180) hideRegalitoBubble();
+}, { passive: true });
 });
