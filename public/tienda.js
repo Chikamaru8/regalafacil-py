@@ -66,7 +66,7 @@ function getColorObjects(p) {
 }
 
 // ---------- WhatsApp y registro del pedido ----------
-function function buildWhatsAppUrl(product, price, ref) {
+function buildWhatsAppUrl(product, price, ref) {
   const sellerName = appData.seller?.name ? ` (${appData.seller.name})` : "";
   const productUrl = window.location.origin + window.location.pathname + `?p=${product.id}`;
   const colors = getColorObjects(product);
