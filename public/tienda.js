@@ -318,7 +318,11 @@ function openProductModal(id) {
   document.getElementById("modalTitle").textContent = p.name;
   document.getElementById("modalPrice").textContent = formatGs(price);
 
-  // Renderizar variantes de color
+  
+
+  selectedColor = "";
+
+  /*
   const colors = getColorObjects(p);
   const colorContainer = document.getElementById("colorOptions");
 
@@ -349,6 +353,7 @@ function openProductModal(id) {
     colorContainer.innerHTML = '<span class="text-xs text-slate-400">Modelo único</span>';
     selectedColor = "";
   }
+  */
 
   updateModalWhatsappButton();
 
