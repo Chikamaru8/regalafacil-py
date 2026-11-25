@@ -69,8 +69,9 @@ async function showApp() {
 async function refreshBootstrap() {
   state.data = await api('/api/admin/bootstrap');
   setupAdminSearchAndSort(state.data?.products || []);
-  renderLeads();
   populateFormOptions();
+  setupLeadsControls();
+  renderLeads();
   setupPriceFormatter();
 }
 
@@ -191,39 +192,220 @@ function setupPriceFormatter() {
   });
 }
 
-/* ---------- Pedidos ---------- */
+/* ---------- Pedidos, métricas, filtros y exportación Excel ---------- */
 const LEAD_LABELS = { new: 'Nuevo', chatting: 'Conversando', sold: 'Vendido', lost: 'Perdido' };
+const leadFilters = { search: '', seller: '', status: '', date: 'all' };
+
+function getLeadTotalGs(lead) {
+  return (lead.items || []).reduce((sum, it) => sum + (Number(it.qty) || 0) * (Number(it.unit_price_gs) || 0), 0);
+}
+
+function setupLeadsControls() {
+  const sellerSel = $('#leadSellerFilter');
+  if (sellerSel) {
+    const currentVal = leadFilters.seller;
+    const sellerNames = new Set();
+    for (const s of state.data?.sellers || []) {
+      const n = String(s.name || '').trim();
+      if (n) sellerNames.add(n);
+    }
+    for (const l of state.data?.leads || []) {
+      const n = String(l.seller_name || '').trim();
+      if (n) sellerNames.add(n);
+    }
+    const sorted = Array.from(sellerNames).sort((a, b) => a.localeCompare(b, 'es'));
+    sellerSel.innerHTML =
+      `<option value="">Vendedor: Todos</option>` +
+      `<option value="__none__">Sin vendedor (Admin)</option>` +
+      sorted.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    sellerSel.value = currentVal;
+
+    if (!sellerSel.dataset.initialized) {
+      sellerSel.dataset.initialized = 'true';
+      sellerSel.addEventListener('change', (e) => {
+        leadFilters.seller = e.target.value;
+        renderLeads();
+      });
+    }
+  }
+
+  const searchEl = $('#leadSearchInput');
+  if (searchEl && !searchEl.dataset.initialized) {
+    searchEl.dataset.initialized = 'true';
+    searchEl.addEventListener('input', (e) => {
+      leadFilters.search = e.target.value.trim().toLowerCase();
+      renderLeads();
+    });
+  }
+
+  const statusEl = $('#leadStatusFilter');
+  if (statusEl && !statusEl.dataset.initialized) {
+    statusEl.dataset.initialized = 'true';
+    statusEl.addEventListener('change', (e) => {
+      leadFilters.status = e.target.value;
+      renderLeads();
+    });
+  }
+
+  const dateEl = $('#leadDateFilter');
+  if (dateEl && !dateEl.dataset.initialized) {
+    dateEl.dataset.initialized = 'true';
+    dateEl.addEventListener('change', (e) => {
+      leadFilters.date = e.target.value;
+      renderLeads();
+    });
+  }
+
+  const exportBtn = $('#exportLeadsBtn');
+  if (exportBtn && !exportBtn.dataset.initialized) {
+    exportBtn.dataset.initialized = 'true';
+    exportBtn.addEventListener('click', exportLeadsToExcel);
+  }
+}
+
+function getFilteredLeads() {
+  const all = state.data?.leads || [];
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000;
+  const sevenDaysAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
+
+  return all.filter((l) => {
+    if (leadFilters.status && l.status !== leadFilters.status) return false;
+
+    if (leadFilters.seller === '__none__') {
+      if (String(l.seller_name || '').trim() !== '') return false;
+    } else if (leadFilters.seller) {
+      if (String(l.seller_name || '').trim() !== leadFilters.seller) return false;
+    }
+
+    const ts = Number(l.created_at) || 0;
+    if (leadFilters.date === 'today' && ts < startOfToday) return false;
+    if (leadFilters.date === '7d' && ts < sevenDaysAgo) return false;
+    if (leadFilters.date === 'month' && ts < startOfMonth) return false;
+
+    if (leadFilters.search) {
+      const itemsStr = (l.items || []).map((it) => it.product_name || '').join(' ');
+      const haystack = `${l.ref || ''} ${l.customer_name || ''} ${l.customer_phone || ''} ${l.seller_name || ''} ${itemsStr} ${l.note || ''}`.toLowerCase();
+      if (!haystack.includes(leadFilters.search)) return false;
+    }
+
+    return true;
+  });
+}
+
+function renderLeadMetrics(leads) {
+  const box = $('#leadsMetrics');
+  if (!box) return;
+
+  const total = leads.length;
+  const soldList = leads.filter((l) => l.status === 'sold');
+  const pendingCount = leads.filter((l) => l.status === 'new' || l.status === 'chatting').length;
+  const soldGs = soldList.reduce((acc, l) => acc + getLeadTotalGs(l), 0);
+  const convRate = total > 0 ? Math.round((soldList.length / total) * 100) : 0;
+
+  box.innerHTML = `
+    <div class="metric-card">
+      <p class="metric-label">Consultas</p>
+      <p class="metric-val">${total}</p>
+      <p class="metric-sub">${pendingCount} pendientes</p>
+    </div>
+    <div class="metric-card">
+      <p class="metric-label">Vendidos</p>
+      <p class="metric-val" style="color:#15803d;">${soldList.length}</p>
+      <p class="metric-sub">Conversión: ${convRate}%</p>
+    </div>
+    <div class="metric-card">
+      <p class="metric-label">Total vendido</p>
+      <p class="metric-val" style="color:#e11d48;">${fmtGs(soldGs)}</p>
+      <p class="metric-sub">Según filtro actual</p>
+    </div>
+  `;
+}
+
+function exportLeadsToExcel() {
+  const leads = getFilteredLeads();
+  if (!leads.length) {
+    alert('No hay pedidos para exportar con el filtro actual.');
+    return;
+  }
+
+  const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const headers = ['Fecha y Hora', 'Ref', 'Estado', 'Vendedor', 'Productos', 'Cantidad Total', 'Monto Total (Gs.)', 'Cliente', 'Teléfono', 'Nota'];
+
+  const rows = leads.map((l) => {
+    const fecha = l.created_at ? new Date(l.created_at * 1000).toLocaleString('es-PY') : '';
+    const itemsText = (l.items || []).map((it) => `${it.qty}x ${it.product_name} (${fmtGs(it.unit_price_gs)})`).join(' | ');
+    const qtyTotal = (l.items || []).reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+    const totalGs = getLeadTotalGs(l);
+
+    return [
+      fecha,
+      l.ref || ('#' + l.id),
+      LEAD_LABELS[l.status] || l.status || '',
+      l.seller_name || 'Administrador',
+      itemsText,
+      qtyTotal,
+      totalGs,
+      l.customer_name || 'Cliente',
+      l.customer_phone || '',
+      l.note || ''
+    ].map(csvCell).join(';');
+  });
+
+  const csvContent = '\uFEFF' + [headers.map(csvCell).join(';'), ...rows].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `pedidos-regalafacil-${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 function renderLeads() {
   const list = $('#leadsList');
-  const leads = state.data?.leads || [];
+  const leads = getFilteredLeads();
+  renderLeadMetrics(leads);
+
   if (!leads.length) {
-    list.innerHTML = '<p class="muted">No hay pedidos registrados todavía.</p>';
+    list.innerHTML = '<p class="muted">No hay pedidos que coincidan con el filtro.</p>';
     return;
   }
 
   list.innerHTML = leads.map((l) => {
-    const itemsText = (l.items || [])
-      .map((it) => `${it.qty}x ${it.product_name} (${fmtGs(it.unit_price_gs)})`)
-      .join(' · ');
+    const items = l.items || [];
+    const itemsHtml = items.length
+      ? items.map((it) => `<div>• ${it.qty}x <strong>${escapeHtml(it.product_name)}</strong> (${fmtGs(it.unit_price_gs)})</div>`).join('')
+      : '<div class="muted">Sin detalle de producto</div>';
+    const totalGs = getLeadTotalGs(l);
     const wa = waLink(l.customer_phone);
 
     return `
       <article class="card">
         <div class="card-body">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-            <strong>Ref ${escapeHtml(l.ref || ('#' + l.id))}</strong>
-            <select data-lead-status="${l.id}" style="padding:5px 8px;border-radius:8px;border:1px solid #d0d5dd;">
-              ${Object.entries(LEAD_LABELS).map(([val, label]) =>
-                `<option value="${val}" ${l.status === val ? 'selected' : ''}>${label}</option>`
-              ).join('')}
-            </select>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <strong>Ref ${escapeHtml(l.ref || ('#' + l.id))}</strong>
+              <span class="pill">👤 ${escapeHtml(l.seller_name || 'Administrador')}</span>
+              ${totalGs > 0 ? `<span class="pill pill-ok">${fmtGs(totalGs)}</span>` : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <select data-lead-status="${l.id}" style="padding:5px 8px;border-radius:8px;border:1px solid #d0d5dd;background:#fff;">
+                ${Object.entries(LEAD_LABELS).map(([val, label]) =>
+                  `<option value="${val}" ${l.status === val ? 'selected' : ''}>${label}</option>`
+                ).join('')}
+              </select>
+              <button type="button" class="btn btn-danger btn-sm" data-delete-lead="${l.id}" title="Eliminar pedido" style="padding:5px 8px;">✕</button>
+            </div>
           </div>
-          <p class="muted" style="margin:4px 0 2px;">${l.created_at ? new Date(l.created_at * 1000).toLocaleString('es-PY') : ''}</p>
-          <p style="margin:6px 0 2px;"><strong>${escapeHtml(l.customer_name || 'Cliente')}</strong>${l.customer_phone ? ' · ' + escapeHtml(l.customer_phone) : ''}</p>
-          ${l.seller_name ? `<p class="muted" style="margin:0 0 4px;">Vendedor: ${escapeHtml(l.seller_name)}</p>` : ''}
-          ${itemsText ? `<p class="muted" style="margin:0 0 4px;">${escapeHtml(itemsText)}</p>` : ''}
-          ${l.note ? `<p class="muted" style="margin:0;">Nota: ${escapeHtml(l.note)}</p>` : ''}
+          <p class="muted" style="margin:6px 0 4px;font-size:12px;">📅 ${l.created_at ? new Date(l.created_at * 1000).toLocaleString('es-PY') : ''}</p>
+          <p style="margin:4px 0;"><strong>${escapeHtml(l.customer_name || 'Cliente')}</strong>${l.customer_phone ? ' · ' + escapeHtml(l.customer_phone) : ''}</p>
+          <div style="margin:6px 0;font-size:13px;line-height:1.45;">${itemsHtml}</div>
+          ${l.note ? `<p class="muted" style="margin:4px 0 0;">Nota: ${escapeHtml(l.note)}</p>` : ''}
           ${wa ? `<p style="margin:8px 0 0;"><a class="btn btn-ghost btn-sm" href="${wa}" target="_blank" rel="noopener">Escribir por WhatsApp</a></p>` : ''}
         </div>
       </article>
@@ -232,14 +414,33 @@ function renderLeads() {
 
   list.querySelectorAll('[data-lead-status]').forEach((sel) => {
     sel.addEventListener('change', async () => {
+      const id = Number(sel.dataset.leadStatus);
+      const newStatus = sel.value;
       try {
         await api('/api/admin/leads', {
           method: 'PUT',
-          body: JSON.stringify({ id: Number(sel.dataset.leadStatus), status: sel.value })
+          body: JSON.stringify({ id, status: newStatus })
         });
+        const target = (state.data?.leads || []).find((x) => x.id === id);
+        if (target) target.status = newStatus;
+        renderLeads();
       } catch (err) {
         alert(err.message);
         await refreshBootstrap();
+      }
+    });
+  });
+
+  list.querySelectorAll('[data-delete-lead]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = Number(btn.dataset.deleteLead);
+      if (!confirm('¿Eliminar este pedido del historial?')) return;
+      try {
+        await api(`/api/admin/leads?id=${id}`, { method: 'DELETE' });
+        state.data.leads = (state.data.leads || []).filter((x) => x.id !== id);
+        renderLeads();
+      } catch (err) {
+        alert(err.message);
       }
     });
   });
