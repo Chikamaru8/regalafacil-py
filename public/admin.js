@@ -465,22 +465,23 @@ function buildAiPrompt(city, phone, sellerName) {
   const categoriesList = (state.data?.categories || []).map((c) => c.name).join(', ') || 'General';
   return [
     'Analizá cada fotografía adjunta de forma 100% independiente para cargar productos en la tienda RegaláFácil PY (Paraguay).',
-    'NO mezcles datos entre fotos ni inventes precios, medidas, materiales o descripciones que no estén visibles en la imagen.',
-    'Si un precio o dato no se lee con claridad, dejalo en null o 0 y poné "requiere_revision": true.',
-    'Detectá oferta ("tiene_oferta": true) SOLO si hay dos precios claros (precio normal/tachado y precio promocional/oferta).',
-    'Identificá qué tipo de producto es y generá un "detalle_corto" breve (máximo 75 caracteres, sin párrafos largos) con el dato clave visible o propio del tipo de producto para darle mayor visibilidad.',
+    'NO mezcles datos entre fotos ni inventes precios, capacidades, medidas o características que no estén visibles o claras en la imagen.',
+    'Si un precio o dato no se lee con claridad, dejalo en 0 y poné "requiere_revision": true.',
+    'Detectá oferta ("tiene_oferta": true) SOLO si hay dos precios claros (precio promocional/actual y precio anterior/tachado).',
+    'Identificá qué tipo de producto es y redactá un "detalle_corto" breve (máximo 75 caracteres, directo y sin relleno) con el dato clave visible o propio del tipo de producto para darle mayor visibilidad.',
     `Usá exactamente esta ciudad para todos los productos: "${city}".`,
     `Usá exactamente este teléfono de contacto para todos los productos: "${phone}"${sellerName ? ` (Vendedor: ${sellerName})` : ''}.`,
     `Categorías disponibles de referencia (si encaja alguna, usá su nombre): ${categoriesList}.`,
-    'Respondé ÚNICAMENTE con un JSON válido (sin texto adicional antes ni después) con esta estructura:',
+    'Respondé ÚNICAMENTE con un JSON válido (sin texto antes ni después) con esta estructura:',
     JSON.stringify({
       productos: [
         {
-          nombre: 'Nombre exacto o legible del producto',
-          tipo_producto: 'Ej: Termo, Box de regalo, Perfume, Calzado',
+          indice_imagen: 1,
+          nombre: 'Nombre del producto',
+          tipo_producto: 'Ej: Termo, Aromatizante, Hidrolavadora, Box',
           detalle_corto: 'Frase corta de alto impacto (máx. 75 caracteres)',
-          descripcion: 'Descripción clara basada solo en lo visible en la foto',
-          precio: 150000,
+          descripcion: 'Descripción clara basada en lo visible en la foto',
+          precio: 220000,
           tiene_oferta: false,
           precio_anterior: null,
           categoria: '',
@@ -537,7 +538,8 @@ function applyAiItemToForm(item) {
   }
 
   if (item.descripcion) {
-    $('#prodDesc').value = String(item.descripcion).trim().slice(0, 1000);
+    const idxTag = item.indice_imagen ? `[Foto #${item.indice_imagen}] ` : '';
+    $('#prodDesc').value = `${idxTag}${String(item.descripcion).trim()}`.trim().slice(0, 1000);
   }
 
   const shortDetailInput = $('#prodShortDetail');
@@ -643,6 +645,81 @@ function setupAiAssistantControls() {
         applyAiItemToForm(aiBatchItems[0]);
       } catch (err) {
         $('#aiHelperMsg').textContent = `❌ ${err.message}`;
+      }
+    });
+  }
+
+  const createAllBtn = $('#createAllAiJsonBtn');
+  if (createAllBtn && !createAllBtn.dataset.listener) {
+    createAllBtn.dataset.listener = 'true';
+    createAllBtn.addEventListener('click', async () => {
+      try {
+        const items = parseAiJsonText($('#aiJsonInput')?.value || '');
+        if (!items.length) throw new Error('No hay productos en el JSON.');
+
+        const sellerIdVal = $('#prodSeller')?.value ? Number($('#prodSeller').value) : null;
+        const fallbackCity = String($('#prodCity')?.value || '').trim();
+        let createdCount = 0;
+
+        createAllBtn.disabled = true;
+        $('#aiHelperMsg').textContent = `Creando ${items.length} productos...`;
+
+        for (const item of items) {
+          const name = String(item?.nombre || '').trim().slice(0, 120);
+          if (!name) continue;
+
+          const normalPrice = digitsToInt(item?.precio_anterior || item?.precio);
+          const promoPrice = digitsToInt(item?.tiene_oferta ? item?.precio : item?.precio_oferta);
+          const finalPrice = normalPrice > 0 ? normalPrice : (promoPrice > 0 ? promoPrice : 1000);
+          const validOffer = promoPrice > 0 && promoPrice < finalPrice ? promoPrice : 0;
+
+          const cityVal = String(item?.ciudad || fallbackCity || '').trim().slice(0, 80);
+          const shortDetailVal = String(item?.detalle_corto || item?.detalleCorto || '').trim().slice(0, 90);
+          const idxNote = item?.indice_imagen ? `[Foto #${item.indice_imagen}] ` : '';
+          const descVal = `${idxNote}${String(item?.descripcion || '').trim()}`.trim().slice(0, 1000);
+
+          let categoryId = $('#prodCategory')?.value ? Number($('#prodCategory').value) : null;
+          if (item?.categoria) {
+            const targetCat = String(item.categoria).trim().toLowerCase();
+            const match = (state.data?.categories || []).find((c) => String(c.name || '').trim().toLowerCase() === targetCat);
+            if (match) categoryId = Number(match.id);
+          }
+
+          const attrs = {
+            colors: [],
+            ...(cityVal ? { city: cityVal } : {}),
+            ...(shortDetailVal ? { short_detail: shortDetailVal } : {}),
+            ...(sellerIdVal ? { seller_id: sellerIdVal } : {})
+          };
+
+          await api('/api/admin/products', {
+            method: 'POST',
+            body: JSON.stringify({
+              name,
+              price_gs: finalPrice,
+              offer_price_gs: validOffer,
+              offer_ends_at: null,
+              category_id: categoryId,
+              status: 'active',
+              seller_id: sellerIdVal,
+              city: cityVal,
+              attributes: attrs,
+              description: descVal,
+              tag_ids: [],
+              image_ids: [],
+              colors: '[]'
+            })
+          });
+          createdCount++;
+        }
+
+        await refreshBootstrap();
+        $('#productModal').close();
+        alert(`Listo: se crearon ${createdCount} productos. Ahora entrá a Editar en cada uno para subir su foto y revisar.`);
+      } catch (err) {
+        $('#aiHelperMsg').textContent = `❌ ${err.message}`;
+      } finally {
+        createAllBtn.disabled = false;
       }
     });
   }
