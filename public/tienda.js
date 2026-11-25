@@ -224,20 +224,31 @@ function renderCategories() {
   container.innerHTML = html;
 }
 
-function matchesGiftTags(product, giftContext) {
-  if (!giftContext) return true;
+function getGiftMatchScore(product, giftContext) {
+  if (!giftContext) return 0;
   const selectedTagIds = [
     giftContext.recipientTagId,
     giftContext.occasionTagId,
     giftContext.ageTagId
   ].filter(id => id != null && id !== "").map(Number);
 
-  if (!selectedTagIds.length) return true;
-
   const prodTagIds = Array.isArray(product.tag_ids) ? product.tag_ids.map(Number) : [];
-  if (!prodTagIds.length) return false;
+  let score = 0;
 
-  return selectedTagIds.every(tagId => prodTagIds.includes(tagId));
+  for (const tagId of selectedTagIds) {
+    if (prodTagIds.includes(tagId)) score += 10;
+  }
+
+  const text = `${product.name || ''} ${product.description || ''} ${product.attributes?.short_detail || ''}`.toLowerCase();
+  const labels = [giftContext.recipientLabel, giftContext.occasionLabel, giftContext.ageLabel]
+    .map(s => String(s || '').toLowerCase().trim())
+    .filter(Boolean);
+
+  for (const lbl of labels) {
+    if (lbl && text.includes(lbl)) score += 2;
+  }
+
+  return score;
 }
 
 function renderProducts() {
@@ -254,9 +265,35 @@ function renderProducts() {
     const matchesBudget = state.maxBudget === 0 || price <= state.maxBudget;
     const prodCity = String(p?.attributes?.city || '').trim().toLowerCase();
     const matchesCity = state.city === "" || prodCity === state.city.toLowerCase();
-    const matchesGift = matchesGiftTags(p, state.giftContext);
-    return matchesSearch && matchesCat && matchesBudget && matchesCity && matchesGift;
+    return matchesSearch && matchesCat && matchesBudget && matchesCity;
   });
+
+  const assistantTitleEl = document.getElementById("assistantTitleMsg");
+  if (state.giftContext) {
+    const hasSelectedCriteria = Boolean(
+      state.giftContext.recipientTagId ||
+      state.giftContext.occasionTagId ||
+      state.giftContext.ageTagId ||
+      state.giftContext.recipientLabel ||
+      state.giftContext.occasionLabel ||
+      state.giftContext.ageLabel
+    );
+
+    if (hasSelectedCriteria && list.length > 0) {
+      const scored = list.map(p => ({ p, score: getGiftMatchScore(p, state.giftContext) }));
+      const matched = scored.filter(item => item.score > 0);
+
+      if (matched.length > 0) {
+        matched.sort((a, b) => b.score - a.score);
+        list = matched.map(item => item.p);
+        if (assistantTitleEl) assistantTitleEl.textContent = "Ideas recomendadas para vos";
+      } else {
+        if (assistantTitleEl) assistantTitleEl.textContent = "Opciones sugeridas dentro de tu presupuesto";
+      }
+    } else if (assistantTitleEl) {
+      assistantTitleEl.textContent = "Ideas recomendadas para vos";
+    }
+  }
 
   if (state.sort === "price_asc") {
     list.sort((a, b) => getEffectivePrice(a) - getEffectivePrice(b));
