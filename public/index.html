@@ -95,7 +95,7 @@
             Ver todo
           </button>
 
-          <!-- REGALITO BOT MÓVIL (ARRIBA A LA DERECHA, GRANDE Y CON GLOBO DE DIÁLOGO) -->
+          <!-- REGALITO BOT MÓVIL -->
           <div class="md:hidden relative flex items-center">
             <div
               id="regalitoBubbleMobile"
@@ -203,16 +203,29 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <label for="citySelect" class="text-[11px] font-semibold text-slate-500">Filtrar por ciudad:</label>
-          <div class="relative">
-            <select
-              id="citySelect"
-              onchange="handleCityFilter(this.value)"
-              class="appearance-none bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-semibold rounded-xl pl-3 pr-8 py-2 focus:outline-none focus:border-brand-500 cursor-pointer transition"
+          <!-- SELECTOR MÚLTIPLE DE CIUDADES -->
+          <span class="text-[11px] font-semibold text-slate-500">Zona del local:</span>
+          <div class="relative" id="cityFilterWrap">
+            <button
+              type="button"
+              id="cityFilterBtn"
+              onclick="toggleCityDropdown()"
+              class="bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-semibold rounded-xl pl-3 pr-2.5 py-2 flex items-center gap-2 focus:outline-none focus:border-brand-500 cursor-pointer transition"
             >
-              <option value="">Todas las ciudades</option>
-            </select>
-            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              <span id="cityFilterLabel">Todas las ciudades</span>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+            </button>
+
+            <div
+              id="cityDropdown"
+              class="hidden absolute right-0 sm:left-0 mt-1.5 w-56 bg-white rounded-2xl shadow-xl border border-slate-200/90 p-2 z-40 animate-pop"
+            >
+              <div class="flex items-center justify-between px-2 py-1.5 border-b border-slate-100 mb-1">
+                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Elegí una o más</span>
+                <button type="button" onclick="clearCityFilter()" class="text-[11px] font-bold text-brand-600 hover:underline cursor-pointer">Todas</button>
+              </div>
+              <div id="cityOptionsList" class="max-h-56 overflow-y-auto space-y-0.5"></div>
+            </div>
           </div>
 
           <label for="sortSelect" class="text-[11px] font-semibold text-slate-500 hidden sm:inline">Ordenar por:</label>
@@ -252,7 +265,7 @@
 
   </div>
 
-  <!-- REGALITO BOT ESCRITORIO (ESQUINA INFERIOR DERECHA CON GLOBO DE DIÁLOGO) -->
+  <!-- REGALITO BOT ESCRITORIO -->
   <div class="hidden md:flex fixed bottom-4 right-6 z-30 flex-col items-end gap-2">
     <div
       id="regalitoBubble"
@@ -331,7 +344,7 @@
   </div>
 
   <!-- ===================================================================== -->
-  <!-- MODAL 2: ASISTENTE DE REGALOS (CONECTADO A ETIQUETAS: PARA QUIÉN / OCASIÓN / EDAD) -->
+  <!-- MODAL 2: ASISTENTE DE REGALOS -->
   <!-- ===================================================================== -->
   <div id="giftModal" class="fixed inset-0 z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div onclick="closeGiftAssistant()" class="absolute inset-0 bg-slate-950/65 backdrop-blur-xs"></div>

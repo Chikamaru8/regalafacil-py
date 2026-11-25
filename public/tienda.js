@@ -1,6 +1,6 @@
 const BRAND_NAME = "Regalafacil PY";
 let appData = { settings: {}, seller: null, sellers: [], cities: [], categories: [], tags: [], products: [] };
-let state = { search: "", categoryId: "", maxBudget: 0, city: "", sort: "featured", giftContext: null };
+let state = { search: "", categoryId: "", maxBudget: 0, cities: [], sort: "featured", giftContext: null };
 let selectedColor = "";
 let currentProduct = null;
 let pendingRef = "";
@@ -147,10 +147,8 @@ function getEffectivePrice(p) {
   return Number(p.price_gs || 0);
 }
 
-function renderCities() {
-  const select = document.getElementById("citySelect");
-  if (!select) return;
-
+// ---------- Selector múltiple de ciudades ----------
+function getAvailableCities() {
   const citiesMap = new Map();
   for (const c of appData.cities || []) {
     const clean = String(c || '').trim();
@@ -160,17 +158,91 @@ function renderCities() {
     const clean = String(p?.attributes?.city || '').trim();
     if (clean) citiesMap.set(clean.toLowerCase(), clean);
   }
-
-  const cities = Array.from(citiesMap.values()).sort((a, b) => a.localeCompare(b, 'es'));
-  select.innerHTML = `<option value="">Todas las ciudades</option>` +
-    cities.map(city => `<option value="${esc(city)}">${esc(city)}</option>`).join("");
-  select.value = state.city || "";
+  return Array.from(citiesMap.values()).sort((a, b) => a.localeCompare(b, 'es'));
 }
 
-function handleCityFilter(val) {
-  state.city = val;
+function renderCities() {
+  const listEl = document.getElementById("cityOptionsList");
+  if (!listEl) return;
+
+  const cities = getAvailableCities();
+  if (!cities.length) {
+    listEl.innerHTML = `<p class="text-[11px] text-slate-400 px-2 py-2">Sin ciudades cargadas</p>`;
+    updateCityButtonLabel();
+    return;
+  }
+
+  listEl.innerHTML = cities.map(city => {
+    const key = city.toLowerCase();
+    const checked = state.cities.includes(key) ? "checked" : "";
+    return `
+      <label class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-50 cursor-pointer text-xs font-medium text-slate-700 select-none">
+        <input
+          type="checkbox"
+          value="${esc(key)}"
+          ${checked}
+          onchange="toggleCitySelection('${esc(key)}')"
+          class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+        >
+        <span>${esc(city)}</span>
+      </label>
+    `;
+  }).join("");
+
+  updateCityButtonLabel();
+}
+
+function updateCityButtonLabel() {
+  const labelEl = document.getElementById("cityFilterLabel");
+  if (!labelEl) return;
+
+  if (!state.cities.length) {
+    labelEl.textContent = "Todas las ciudades";
+    return;
+  }
+
+  const allCities = getAvailableCities();
+  const selectedNames = state.cities.map(k => allCities.find(c => c.toLowerCase() === k) || k);
+
+  if (selectedNames.length === 1) {
+    labelEl.textContent = selectedNames[0];
+  } else {
+    labelEl.textContent = `${selectedNames[0]} +${selectedNames.length - 1}`;
+  }
+}
+
+function toggleCityDropdown() {
+  const dd = document.getElementById("cityDropdown");
+  if (!dd) return;
+  dd.classList.toggle("hidden");
+}
+
+function toggleCitySelection(cityKey) {
+  const idx = state.cities.indexOf(cityKey);
+  if (idx >= 0) {
+    state.cities.splice(idx, 1);
+  } else {
+    state.cities.push(cityKey);
+  }
+  updateCityButtonLabel();
   renderProducts();
 }
+
+function clearCityFilter() {
+  state.cities = [];
+  renderCities();
+  renderProducts();
+  const dd = document.getElementById("cityDropdown");
+  if (dd) dd.classList.add("hidden");
+}
+
+document.addEventListener("click", (e) => {
+  const wrap = document.getElementById("cityFilterWrap");
+  const dd = document.getElementById("cityDropdown");
+  if (wrap && dd && !wrap.contains(e.target)) {
+    dd.classList.add("hidden");
+  }
+});
 
 async function initCatalog() {
   document.title = BRAND_NAME;
@@ -264,7 +336,7 @@ function renderProducts() {
     const price = getEffectivePrice(p);
     const matchesBudget = state.maxBudget === 0 || price <= state.maxBudget;
     const prodCity = String(p?.attributes?.city || '').trim().toLowerCase();
-    const matchesCity = state.city === "" || prodCity === state.city.toLowerCase();
+    const matchesCity = state.cities.length === 0 || state.cities.includes(prodCity);
     return matchesSearch && matchesCat && matchesBudget && matchesCity;
   });
 
@@ -303,7 +375,7 @@ function renderProducts() {
     list.sort((a, b) => String(a.name).localeCompare(String(b.name), 'es'));
   }
 
-  const hasActiveFilter = state.search !== "" || state.categoryId !== "" || state.maxBudget > 0 || state.city !== "" || state.giftContext !== null;
+  const hasActiveFilter = state.search !== "" || state.categoryId !== "" || state.maxBudget > 0 || state.cities.length > 0 || state.giftContext !== null;
   if (resetMob) resetMob.classList.toggle("hidden", !hasActiveFilter);
   if (resetDesk) resetDesk.classList.toggle("hidden", !hasActiveFilter);
   if (countLabel) countLabel.textContent = `${list.length} ${list.length === 1 ? 'opción' : 'opciones'}`;
@@ -417,13 +489,15 @@ function resetAllFilters() {
   state.search = "";
   state.categoryId = "";
   state.maxBudget = 0;
-  state.city = "";
+  state.cities = [];
   state.sort = "featured";
   state.giftContext = null;
 
   document.getElementById("searchInput").value = "";
-  const cityEl = document.getElementById("citySelect");
-  if (cityEl) cityEl.value = "";
+  renderCities();
+  const dd = document.getElementById("cityDropdown");
+  if (dd) dd.classList.add("hidden");
+
   document.getElementById("sortSelect").value = "featured";
   document.getElementById("clearSearchBtn").classList.add("hidden");
   document.getElementById("assistantResultBanner").classList.add("hidden");
