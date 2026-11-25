@@ -522,13 +522,36 @@ function finishGiftAssistant(budget) {
 
 // ---------- Regalito Bot (globo inteligente) ----------
 let bubbleTimer = null;
+let greetingSwitchTimer = null;
 
-function showRegalitoBubble() {
+function setRegalitoMessage(text) {
   const bubble = document.getElementById("regalitoBubble");
   if (!bubble) return;
-  bubble.classList.remove("hidden");
+  const span = bubble.querySelector("span");
+  if (span) span.textContent = text;
+}
+
+function showRegalitoBubble(mode = "default") {
+  const bubble = document.getElementById("regalitoBubble");
+  if (!bubble) return;
 
   clearTimeout(bubbleTimer);
+  clearTimeout(greetingSwitchTimer);
+
+  if (mode === "welcome") {
+    setRegalitoMessage("¡Hola! Qué bueno verte por acá 👋");
+    bubble.classList.remove("hidden");
+
+    greetingSwitchTimer = setTimeout(() => {
+      setRegalitoMessage("¿Te ayudo a elegir un regalo? 🎁");
+    }, 3200);
+
+    bubbleTimer = setTimeout(hideRegalitoBubble, 12000);
+    return;
+  }
+
+  setRegalitoMessage("¿Te ayudo a elegir un regalo? 🎁");
+  bubble.classList.remove("hidden");
   bubbleTimer = setTimeout(hideRegalitoBubble, 12000);
 }
 
@@ -536,20 +559,13 @@ function hideRegalitoBubble() {
   const bubble = document.getElementById("regalitoBubble");
   if (bubble) bubble.classList.add("hidden");
   clearTimeout(bubbleTimer);
+  clearTimeout(greetingSwitchTimer);
 }
 
 window.addEventListener("load", () => {
-  setTimeout(showRegalitoBubble, 1500);
+  setTimeout(() => showRegalitoBubble("welcome"), 1200);
 });
 
 window.addEventListener("scroll", () => {
   if (window.scrollY > 180) hideRegalitoBubble();
 }, { passive: true });
-
-document.addEventListener("DOMContentLoaded", () => {
-  // Al tocar "Me interesa" se registra el pedido con el mismo codigo que lleva el mensaje
-  document.getElementById("modalWhatsappBtn").addEventListener("click", () => {
-    if (currentProduct && pendingRef) registerLead(pendingRef, currentProduct);
-  });
-  initCatalog();
-});
