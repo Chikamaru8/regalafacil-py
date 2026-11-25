@@ -532,60 +532,71 @@ function finishGiftAssistant(budget) {
 
 // ---------- Regalito Bot (saludo inicial + consulta predeterminada) ----------
 let bubbleTimer = null;
+let typingTimer = null;
 let greetingSwitchTimer = null;
 
-function setRegalitoMessage(text) {
-  const bubble = document.getElementById("regalitoBubble");
-  if (!bubble) return;
-  const span = bubble.querySelector("span");
-  if (span) span.textContent = text;
+function getAllRegalitoBubbles() {
+  return [
+    document.getElementById("regalitoBubble"),
+    document.getElementById("regalitoBubbleMobile")
+  ].filter(Boolean);
 }
 
-function showRegalitoBubble(mode = "default") {
-  const bubble = document.getElementById("regalitoBubble");
-  if (!bubble) return;
-
-  clearTimeout(bubbleTimer);
-  clearTimeout(greetingSwitchTimer);
-
-  if (mode === "welcome") {
-    setRegalitoMessage("¡Hola! Qué bueno verte por acá 👋");
-    bubble.classList.remove("hidden");
-
-    greetingSwitchTimer = setTimeout(() => {
-      setRegalitoMessage("¿Te ayudo a elegir un regalo? 🎁");
-    }, 3200);
-
-    bubbleTimer = setTimeout(hideRegalitoBubble, 12000);
-    return;
+function setRegalitoMessage(text) {
+  for (const bubble of getAllRegalitoBubbles()) {
+    const span = bubble.querySelector("span");
+    if (span) span.textContent = text;
   }
+}
 
-  setRegalitoMessage("¿Te ayudo a elegir un regalo? 🎁");
-  bubble.classList.remove("hidden");
-  bubbleTimer = setTimeout(hideRegalitoBubble, 12000);
+function showAllRegalitoBubbles() {
+  for (const bubble of getAllRegalitoBubbles()) {
+    bubble.classList.remove("hidden");
+  }
 }
 
 function hideRegalitoBubble() {
-  const bubble = document.getElementById("regalitoBubble");
-  if (bubble) bubble.classList.add("hidden");
+  for (const bubble of getAllRegalitoBubbles()) {
+    bubble.classList.add("hidden");
+  }
   clearTimeout(bubbleTimer);
+  clearTimeout(typingTimer);
   clearTimeout(greetingSwitchTimer);
 }
 
+function showRegalitoBubble(mode = "default") {
+  const bubbles = getAllRegalitoBubbles();
+  if (!bubbles.length) return;
+
+  clearTimeout(bubbleTimer);
+  clearTimeout(typingTimer);
+  clearTimeout(greetingSwitchTimer);
+
+  if (mode === "welcome") {
+    setRegalitoMessage("Regalito está escribiendo...");
+    showAllRegalitoBubbles();
+
+    typingTimer = setTimeout(() => {
+      setRegalitoMessage("¡Hola! Soy Regalito, tu asistente 🤖🎁");
+    }, 900);
+
+    greetingSwitchTimer = setTimeout(() => {
+      setRegalitoMessage("¿Te ayudo a elegir un regalo hoy?");
+    }, 4200);
+
+    bubbleTimer = setTimeout(hideRegalitoBubble, 13000);
+    return;
+  }
+
+  setRegalitoMessage("¿Te ayudo a elegir un regalo hoy? 🎁");
+  showAllRegalitoBubbles();
+  bubbleTimer = setTimeout(hideRegalitoBubble, 12000);
+}
+
 window.addEventListener("load", () => {
-  setTimeout(() => showRegalitoBubble("welcome"), 1200);
+  setTimeout(() => showRegalitoBubble("welcome"), 800);
 });
 
 window.addEventListener("scroll", () => {
   if (window.scrollY > 180) hideRegalitoBubble();
 }, { passive: true });
-
-document.addEventListener("DOMContentLoaded", () => {
-  const waBtn = document.getElementById("modalWhatsappBtn");
-  if (waBtn) {
-    waBtn.addEventListener("click", () => {
-      if (currentProduct && pendingRef) registerLead(pendingRef, currentProduct);
-    });
-  }
-  initCatalog();
-});
