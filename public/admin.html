@@ -39,26 +39,19 @@
     </header>
 
     <main class="container">
-      <!-- <section id="tab-products" class="tab-panel active">
-        <div class="panel-head">
-          <h2>Productos</h2>
-          <button type="button" id="newProductBtn" class="btn btn-primary btn-sm">+ Nuevo producto</button>
-        </div>
-        <div id="productsList" class="cards-list"></div>
-      </section> -->
       <section id="tab-products" class="tab-panel active">
         <div class="panel-head">
           <h2>Productos</h2>
           <button type="button" id="newProductBtn" class="btn btn-primary btn-sm">+ Nuevo producto</button>
         </div>
-        
+
         <!-- Buscador y botones de ordenamiento -->
         <div class="admin-controls" style="margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-            <input type="text" id="searchInput" placeholder="🔍 Buscar producto por nombre..." style="flex: 1; min-width: 220px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff;">
-            <div style="display: flex; gap: 6px;">
-                <button type="button" id="sortByName" class="btn btn-ghost btn-sm" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1;">🔤 Nombre</button>
-                <button type="button" id="sortByPrice" class="btn btn-ghost btn-sm" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1;">💲 Precio</button>
-            </div>
+          <input type="text" id="searchInput" placeholder="🔍 Buscar producto por nombre..." style="flex: 1; min-width: 220px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff;" />
+          <div style="display: flex; gap: 6px;">
+            <button type="button" id="sortByName" class="btn btn-ghost btn-sm" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1;">🔤 Nombre</button>
+            <button type="button" id="sortByPrice" class="btn btn-ghost btn-sm" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1;">💲 Precio</button>
+          </div>
         </div>
 
         <div id="productsList" class="cards-list"></div>
@@ -148,6 +141,13 @@
       </div>
 
       <label class="field">
+        <span>Ciudad del producto / negocio</span>
+        <input type="text" id="prodCity" list="prodCityOptions" placeholder="Ej: Villa Elisa, Asunción, Luque..." />
+        <datalist id="prodCityOptions"></datalist>
+        <small class="muted">Permite que el comprador filtre productos por ciudad en el catálogo.</small>
+      </label>
+
+      <label class="field">
         <span>Descripción</span>
         <textarea id="prodDesc" rows="3" placeholder="Detalles, qué incluye, presentación..."></textarea>
       </label>
@@ -157,12 +157,6 @@
         <div id="prodTags" class="chips-wrap"></div>
       </div>
 
-      <!-- <div class="field">
-        <span>Foto principal del producto (se comprime automáticamente)</span>
-        <input type="file" id="prodImageFile" accept="image/*" />
-        <div id="prodImagePreview" class="img-preview"></div>
-      </div> -->
-
       <!-- FOTO PRINCIPAL INDEPENDIENTE -->
       <div class="field">
         <span>Foto principal del producto (se comprime automáticamente)</span>
@@ -170,7 +164,6 @@
         <div id="prodImagePreview" class="img-preview" style="margin-top: 8px;"></div>
       </div>
 
-      <!-- GALERÍA DE FOTOS ADICIONALES (EXCLUYE LA PRINCIPAL) -->
       <!-- GALERÍA DE FOTOS ADICIONALES (EXCLUYE LA PRINCIPAL) -->
       <div class="field" style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -184,14 +177,7 @@
         <div id="productImagesGallery"></div>
       </div>
 
-      <!-- ===================================================================== -->
-      <!-- GALERÍA DE MÚLTIPLES FOTOS -->
-      <!-- ===================================================================== -->
-      
-
-      <!-- ===================================================================== -->
       <!-- VARIANTES DE COLOR -->
-      <!-- ===================================================================== -->
       <div class="field" id="variantsContainerSection">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <span>Variantes de color (Opcional)</span>

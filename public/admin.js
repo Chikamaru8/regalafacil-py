@@ -102,6 +102,7 @@ function renderProducts(products = []) {
     const imgSrc = firstImgId ? imgUrl(firstImgId) : '';
     const active = offerActive(p);
     const isActive = p.status === 'active';
+    const cityLabel = p.attributes?.city ? String(p.attributes.city).trim() : '';
     return `
       <article class="card">
         ${imgSrc
@@ -111,6 +112,7 @@ function renderProducts(products = []) {
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <h3 class="card-title">${escapeHtml(p.name)}</h3>
             <span class="pill ${isActive ? 'pill-ok' : 'pill-warn'}">${isActive ? 'Activo' : 'Pausado'}</span>
+            ${cityLabel ? `<span class="pill">${escapeHtml(cityLabel)}</span>` : ''}
             ${offerExpired(p) ? '<span class="pill pill-warn">Oferta vencida</span>' : ''}
           </div>
           <div class="price-row">
@@ -251,6 +253,21 @@ function populateFormOptions() {
       <span>${escapeHtml(t.label)}</span>
     </label>
   `).join('');
+
+  const cityDatalist = $('#prodCityOptions');
+  if (cityDatalist) {
+    const citiesSet = new Set();
+    for (const s of state.data?.sellers || []) {
+      const c = String(s.city || '').trim();
+      if (c) citiesSet.add(c);
+    }
+    for (const p of state.data?.products || []) {
+      const c = String(p.attributes?.city || '').trim();
+      if (c) citiesSet.add(c);
+    }
+    const sortedCities = Array.from(citiesSet).sort((a, b) => a.localeCompare(b, 'es'));
+    cityDatalist.innerHTML = sortedCities.map((c) => `<option value="${escapeHtml(c)}"></option>`).join('');
+  }
 }
 
 /* ============================================================
@@ -540,6 +557,8 @@ function openProductModal(prod = null) {
     $('#prodOfferEnds').value = offerActive(prod) ? toLocalInput(prod.offer_ends_at) : '';
     $('#prodCategory').value = prod.category_id || '';
     $('#prodStatus').value = prod.status || 'active';
+    const cityInput = $('#prodCity');
+    if (cityInput) cityInput.value = prod.attributes?.city || '';
     $('#prodDesc').value = prod.description || '';
     $('#deleteProductBtn').hidden = false;
 
@@ -552,6 +571,8 @@ function openProductModal(prod = null) {
     $('#productForm').reset();
     $('#prodId').value = '';
     $('#prodStatus').value = 'active';
+    const cityInput = $('#prodCity');
+    if (cityInput) cityInput.value = '';
     mainPhotoId = null;
     galleryImagesList = [];
     productVariants = [];
@@ -669,6 +690,8 @@ $('#productForm').addEventListener('submit', async (e) => {
       }))
       .filter((v) => v.name);
 
+    const cityVal = String($('#prodCity')?.value || '').trim().slice(0, 80);
+
     let targetId = idVal;
 
     if (!targetId) {
@@ -679,6 +702,7 @@ $('#productForm').addEventListener('submit', async (e) => {
         offer_ends_at: offerEnds,
         category_id: $('#prodCategory').value ? Number($('#prodCategory').value) : null,
         status: $('#prodStatus').value,
+        city: cityVal,
         description: $('#prodDesc').value.trim(),
         tag_ids: tagIds,
         colors: JSON.stringify(colors)
@@ -718,6 +742,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       offer_ends_at: offerEnds,
       category_id: $('#prodCategory').value ? Number($('#prodCategory').value) : null,
       status: $('#prodStatus').value,
+      city: cityVal,
       description: $('#prodDesc').value.trim(),
       tag_ids: tagIds,
       image_ids: finalImageIds,

@@ -126,7 +126,18 @@ function getEffectivePrice(p) {
 function renderCities() {
   const select = document.getElementById("citySelect");
   if (!select) return;
-  const cities = appData.cities || [];
+
+  const citiesMap = new Map();
+  for (const c of appData.cities || []) {
+    const clean = String(c || '').trim();
+    if (clean) citiesMap.set(clean.toLowerCase(), clean);
+  }
+  for (const p of appData.products || []) {
+    const clean = String(p?.attributes?.city || '').trim();
+    if (clean) citiesMap.set(clean.toLowerCase(), clean);
+  }
+
+  const cities = Array.from(citiesMap.values()).sort((a, b) => a.localeCompare(b, 'es'));
   select.innerHTML = `<option value="">Ciudad: Todas</option>` +
     cities.map(city => `<option value="${esc(city)}">${esc(city)}</option>`).join("");
   select.value = state.city || "";
@@ -135,16 +146,6 @@ function renderCities() {
 function handleCityFilter(val) {
   state.city = val;
   renderProducts();
-}
-
-function matchesCityFilter() {
-  if (!state.city) return true;
-  if (appData.seller?.city) {
-    return String(appData.seller.city).trim().toLowerCase() === state.city.toLowerCase();
-  }
-  const sellers = appData.sellers || [];
-  if (!sellers.length) return true;
-  return sellers.some(s => String(s.city || '').trim().toLowerCase() === state.city.toLowerCase());
 }
 
 async function initCatalog() {
@@ -195,16 +196,15 @@ function renderProducts() {
   const resetMob = document.getElementById("resetHeaderBtnMobile");
   const resetDesk = document.getElementById("resetHeaderBtnDesktop");
 
-  const cityOk = matchesCityFilter();
-  let list = cityOk
-    ? (appData.products || []).filter(p => {
-        const matchesSearch = state.search === "" || (p.name + ' ' + (p.description || '')).toLowerCase().includes(state.search);
-        const matchesCat = state.categoryId === "" || String(p.category_id) === String(state.categoryId);
-        const price = getEffectivePrice(p);
-        const matchesBudget = state.maxBudget === 0 || price <= state.maxBudget;
-        return matchesSearch && matchesCat && matchesBudget;
-      })
-    : [];
+  let list = (appData.products || []).filter(p => {
+    const matchesSearch = state.search === "" || (p.name + ' ' + (p.description || '')).toLowerCase().includes(state.search);
+    const matchesCat = state.categoryId === "" || String(p.category_id) === String(state.categoryId);
+    const price = getEffectivePrice(p);
+    const matchesBudget = state.maxBudget === 0 || price <= state.maxBudget;
+    const prodCity = String(p?.attributes?.city || '').trim().toLowerCase();
+    const matchesCity = state.city === "" || prodCity === state.city.toLowerCase();
+    return matchesSearch && matchesCat && matchesBudget && matchesCity;
+  });
 
   if (state.sort === "price_asc") {
     list.sort((a, b) => getEffectivePrice(a) - getEffectivePrice(b));
@@ -232,6 +232,7 @@ function renderProducts() {
     const imgUrl = p.image_ids && p.image_ids.length ? `/api/image/${p.image_ids[0]}?v=${IMG_VER}` : 'https://placehold.co/400x400/f1f5f9/64748b?text=Sin+Foto';
     const catObj = (appData.categories || []).find(c => c.id === p.category_id);
     const catStr = catObj ? catObj.name : 'General';
+    const cityStr = String(p?.attributes?.city || '').trim();
     const badgeText = p.attributes?.badge || (hasOffer ? 'Oferta' : 'Ideal regalo');
 
     return `
@@ -249,7 +250,7 @@ function renderProducts() {
 
         <div class="p-3.5 flex-1 flex flex-col justify-between gap-2">
           <div>
-            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">${esc(catStr)}</span>
+            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">${esc(catStr)}${cityStr ? ` · ${esc(cityStr)}` : ''}</span>
             <h4 class="font-display font-bold text-xs sm:text-sm text-slate-800 line-clamp-2 leading-snug mt-0.5">
               ${esc(p.name)}
             </h4>
