@@ -1,6 +1,6 @@
 const BRAND_NAME = "Regalafacil PY";
-let appData = { settings: {}, seller: null, categories: [], tags: [], products: [] };
-let state = { search: "", categoryId: "", maxBudget: 0, sort: "featured", giftContext: null };
+let appData = { settings: {}, seller: null, sellers: [], cities: [], categories: [], tags: [], products: [] };
+let state = { search: "", categoryId: "", maxBudget: 0, city: "", sort: "featured", giftContext: null };
 let selectedColor = "";
 let currentProduct = null;
 let pendingRef = "";
@@ -123,6 +123,30 @@ function getEffectivePrice(p) {
   return Number(p.price_gs || 0);
 }
 
+function renderCities() {
+  const select = document.getElementById("citySelect");
+  if (!select) return;
+  const cities = appData.cities || [];
+  select.innerHTML = `<option value="">Ciudad: Todas</option>` +
+    cities.map(city => `<option value="${esc(city)}">${esc(city)}</option>`).join("");
+  select.value = state.city || "";
+}
+
+function handleCityFilter(val) {
+  state.city = val;
+  renderProducts();
+}
+
+function matchesCityFilter() {
+  if (!state.city) return true;
+  if (appData.seller?.city) {
+    return String(appData.seller.city).trim().toLowerCase() === state.city.toLowerCase();
+  }
+  const sellers = appData.sellers || [];
+  if (!sellers.length) return true;
+  return sellers.some(s => String(s.city || '').trim().toLowerCase() === state.city.toLowerCase());
+}
+
 async function initCatalog() {
   document.title = BRAND_NAME;
   try {
@@ -141,6 +165,7 @@ async function initCatalog() {
   }
 
   renderCategories();
+  renderCities();
   renderProducts();
   lucide.createIcons();
 
@@ -170,13 +195,16 @@ function renderProducts() {
   const resetMob = document.getElementById("resetHeaderBtnMobile");
   const resetDesk = document.getElementById("resetHeaderBtnDesktop");
 
-  let list = (appData.products || []).filter(p => {
-    const matchesSearch = state.search === "" || (p.name + ' ' + (p.description || '')).toLowerCase().includes(state.search);
-    const matchesCat = state.categoryId === "" || String(p.category_id) === String(state.categoryId);
-    const price = getEffectivePrice(p);
-    const matchesBudget = state.maxBudget === 0 || price <= state.maxBudget;
-    return matchesSearch && matchesCat && matchesBudget;
-  });
+  const cityOk = matchesCityFilter();
+  let list = cityOk
+    ? (appData.products || []).filter(p => {
+        const matchesSearch = state.search === "" || (p.name + ' ' + (p.description || '')).toLowerCase().includes(state.search);
+        const matchesCat = state.categoryId === "" || String(p.category_id) === String(state.categoryId);
+        const price = getEffectivePrice(p);
+        const matchesBudget = state.maxBudget === 0 || price <= state.maxBudget;
+        return matchesSearch && matchesCat && matchesBudget;
+      })
+    : [];
 
   if (state.sort === "price_asc") {
     list.sort((a, b) => getEffectivePrice(a) - getEffectivePrice(b));
@@ -186,7 +214,7 @@ function renderProducts() {
     list.sort((a, b) => String(a.name).localeCompare(String(b.name), 'es'));
   }
 
-  const hasActiveFilter = state.search !== "" || state.categoryId !== "" || state.maxBudget > 0 || state.giftContext !== null;
+  const hasActiveFilter = state.search !== "" || state.categoryId !== "" || state.maxBudget > 0 || state.city !== "" || state.giftContext !== null;
   resetMob.classList.toggle("hidden", !hasActiveFilter);
   resetDesk.classList.toggle("hidden", !hasActiveFilter);
   countLabel.textContent = `${list.length} ${list.length === 1 ? 'opción' : 'opciones'}`;
@@ -291,10 +319,13 @@ function resetAllFilters() {
   state.search = "";
   state.categoryId = "";
   state.maxBudget = 0;
+  state.city = "";
   state.sort = "featured";
   state.giftContext = null;
 
   document.getElementById("searchInput").value = "";
+  const cityEl = document.getElementById("citySelect");
+  if (cityEl) cityEl.value = "";
   document.getElementById("sortSelect").value = "featured";
   document.getElementById("clearSearchBtn").classList.add("hidden");
   document.getElementById("assistantResultBanner").classList.add("hidden");
@@ -330,7 +361,7 @@ function openProductModal(id) {
   document.getElementById("modalTitle").textContent = p.name;
   document.getElementById("modalPrice").textContent = formatGs(price);
 
- syncSelectedVariantByImage(currentActiveImageId);
+  syncSelectedVariantByImage(currentActiveImageId);
 
   updateModalWhatsappButton();
 

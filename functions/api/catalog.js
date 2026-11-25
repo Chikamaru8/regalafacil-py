@@ -9,9 +9,10 @@ export async function onRequestGet({ request, env, waitUntil }) {
   const now = Math.floor(Date.now() / 1000);
 
   // Una sola ida a la base. Sin link de vendedor válido, seller = null (la tienda usa el número del administrador).
-  const [st, sel, cat, tag, prod, imgs] = await env.DB.batch([
+  const [st, sel, allSellers, cat, tag, prod, imgs] = await env.DB.batch([
     env.DB.prepare('SELECT key, value FROM settings'),
-    env.DB.prepare('SELECT id, slug, name, phone FROM seller WHERE slug = ? AND active = 1').bind(slug),
+    env.DB.prepare('SELECT id, slug, name, city, phone FROM seller WHERE slug = ? AND active = 1').bind(slug),
+    env.DB.prepare('SELECT id, slug, name, city, phone FROM seller WHERE active = 1 ORDER BY name COLLATE NOCASE, id'),
     env.DB.prepare('SELECT id, slug, name FROM category WHERE active = 1 ORDER BY sort_order, id'),
     env.DB.prepare('SELECT id, group_key, slug, label FROM tag ORDER BY id'),
     env.DB.prepare(`
@@ -28,6 +29,15 @@ export async function onRequestGet({ request, env, waitUntil }) {
   const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
   const nums = (s) => (s ? s.split(',').map(Number) : []);
 
+  const sellersList = allSellers.results || [];
+  const citiesList = Array.from(
+    new Set(
+      sellersList
+        .map((s) => String(s.city || '').trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, 'es'));
+
   // Agrupar las imágenes por producto mapeando ID y color_key
   const imagesByProduct = {};
   for (const img of imgs.results) {
@@ -41,6 +51,8 @@ export async function onRequestGet({ request, env, waitUntil }) {
   const body = JSON.stringify({
     settings,
     seller: sel.results[0] || null,
+    sellers: sellersList,
+    cities: citiesList,
     categories: cat.results,
     tags: tag.results,
     products: prod.results.map((p) => {
@@ -50,8 +62,8 @@ export async function onRequestGet({ request, env, waitUntil }) {
         ...p,
         attributes: attrs,
         colors: attrs.colors || [],
-        images: productImages, // Detalle completo de imágenes con su color_key
-        image_ids: productImages.map(img => img.id), // Compatibilidad con vistas previas existentes
+        images: productImages,
+        image_ids: productImages.map(img => img.id),
         tag_ids: nums(p.tag_ids)
       };
     })
