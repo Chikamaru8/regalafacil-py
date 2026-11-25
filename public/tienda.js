@@ -81,11 +81,11 @@ function buildWhatsAppUrl(product, price, ref) {
   }
 
   if (selectedColor) {
-    message += `🎨 Variante disponible: *${selectedColor}*\n`;
+    message += `🎨 Variante elegida: *${selectedColor}*\n`;
   } else if (colors.length === 1) {
     message += `🎨 Variante disponible: *${colors[0].name}*\n`;
   } else if (colors.length > 1) {
-    message += `🎨 Opciones del producto: *${colors.map(c => c.name).join(", ")}*\n`;
+    message += `🎨 Opciones disponibles: *${colors.map(c => c.name).join(", ")}* (indicar cuál preferís)\n`;
   }
 
   if (state.giftContext) {
@@ -378,6 +378,13 @@ function renderModalThumbnails(images) {
 window.setActiveImage = function(imgId) {
   currentActiveImageId = imgId;
   updateModalImageDisplay();
+
+  // Detecta si la foto seleccionada está vinculada a una variante en el admin
+  if (currentProduct) {
+    const matched = getColorObjects(currentProduct).find(c => String(c.image_id) === String(imgId));
+    selectedColor = matched ? matched.name : "";
+    updateModalWhatsappButton();
+  }
 
   const thumbContainer = document.getElementById("modalThumbnails");
   if (thumbContainer) {
