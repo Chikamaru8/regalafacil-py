@@ -330,7 +330,7 @@ function openProductModal(id) {
   document.getElementById("modalTitle").textContent = p.name;
   document.getElementById("modalPrice").textContent = formatGs(price);
 
-  selectedColor = "";
+ syncSelectedVariantByImage(currentActiveImageId);
 
   updateModalWhatsappButton();
 
@@ -375,16 +375,30 @@ function renderModalThumbnails(images) {
   `).join("");
 }
 
+function syncSelectedVariantByImage(imgId) {
+  if (!currentProduct) {
+    selectedColor = "";
+    return;
+  }
+  const colors = getColorObjects(currentProduct);
+  const images = currentProduct.images || (currentProduct.image_ids ? currentProduct.image_ids.map(id => ({ id })) : []);
+  const matched = colors.find(c => String(c.image_id) === String(imgId));
+
+  if (matched) {
+    selectedColor = matched.name;
+  } else if ((colors.length > 0 || images.length > 1) && images.length > 0 && String(images[0].id) === String(imgId)) {
+    selectedColor = "Modelo principal (foto de portada)";
+  } else {
+    selectedColor = "";
+  }
+}
+
 window.setActiveImage = function(imgId) {
   currentActiveImageId = imgId;
   updateModalImageDisplay();
 
-  // Detecta si la foto seleccionada está vinculada a una variante en el admin
-  if (currentProduct) {
-    const matched = getColorObjects(currentProduct).find(c => String(c.image_id) === String(imgId));
-    selectedColor = matched ? matched.name : "";
-    updateModalWhatsappButton();
-  }
+  syncSelectedVariantByImage(imgId);
+  updateModalWhatsappButton();
 
   const thumbContainer = document.getElementById("modalThumbnails");
   if (thumbContainer) {
