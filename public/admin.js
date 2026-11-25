@@ -255,8 +255,8 @@ function populateFormOptions() {
 
 /* ============================================================
    ESTADO DE IMÁGENES ESTRICTAMENTE SEPARADO
-   - mainPhotoId: ID único de la foto principal (independiente)
-   - galleryImagesList: Array de IDs exclusivo para la galería
+- mainPhotoId: ID único de la foto principal (independiente)
+- galleryImagesList: Array de IDs exclusivo para la galería
    ============================================================ */
 let productVariants = [];
 let mainPhotoId = null;
@@ -465,6 +465,7 @@ function renderVariantsForm(variants = productVariants) {
 
       <select data-variant-img="${index}" style="padding:6px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
         <option value="">📸 Foto por defecto</option>
+        ${mainPhotoId ? `<option value="${mainPhotoId}" ${Number(v.image_id) === Number(mainPhotoId) ? 'selected' : ''}>⭐ Foto principal (Portada)</option>` : ''}
         ${galleryImagesList.map((id, gIdx) => `
           <option value="${id}" ${Number(v.image_id) === Number(id) ? 'selected' : ''}>Foto #${gIdx + 1}</option>
         `).join('')}
