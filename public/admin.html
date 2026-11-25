@@ -142,6 +142,37 @@
 
       <input type="hidden" id="prodId" />
 
+      <!-- ASISTENTE DE CARGA CON IA (SIN API PAGA) -->
+      <div class="settings-card" style="background:#f8fafc;border:1px solid #cbd5e1;padding:12px;margin-bottom:4px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+          <strong style="font-size:13px;">🤖 Carga asistida por IA (sin costo de API)</strong>
+          <button type="button" id="genAiPromptBtn" class="btn btn-ghost btn-sm" style="background:#fff;border:1px solid #cbd5e1;">Generar prompt</button>
+        </div>
+
+        <div id="aiPromptBox" hidden style="margin-bottom:10px;">
+          <label class="field">
+            <span>Copiá este prompt y pegalo junto con las fotos en tu IA</span>
+            <textarea id="aiPromptOutput" rows="7" readonly style="font-size:12px;background:#fff;"></textarea>
+          </label>
+          <button type="button" id="copyAiPromptBtn" class="btn btn-ghost btn-sm" style="margin-top:6px;">📋 Copiar prompt</button>
+        </div>
+
+        <label class="field">
+          <span>Pegá aquí el JSON que devolvió la IA</span>
+          <textarea id="aiJsonInput" rows="3" placeholder='{"productos":[{"nombre":"...","precio":150000,...}]}' style="font-size:12px;background:#fff;"></textarea>
+        </label>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">
+          <button type="button" id="applyAiJsonBtn" class="btn btn-ghost btn-sm" style="background:#fff;border:1px solid #cbd5e1;">✨ Autocompletar</button>
+          <div id="aiBatchNav" hidden style="display:flex;align-items:center;gap:6px;font-size:12px;">
+            <button type="button" id="aiPrevBtn" class="btn btn-ghost btn-sm">◀</button>
+            <span id="aiBatchCounter">1 / 1</span>
+            <button type="button" id="aiNextBtn" class="btn btn-ghost btn-sm">▶</button>
+          </div>
+        </div>
+        <p id="aiHelperMsg" class="muted" style="margin:6px 0 0;font-size:12px;"></p>
+      </div>
+
       <label class="field">
         <span>Nombre del regalo *</span>
         <input type="text" id="prodName" required placeholder="Ej: Box Matero Premium" />
@@ -194,6 +225,12 @@
       <label class="field">
         <span>Descripción</span>
         <textarea id="prodDesc" rows="3" placeholder="Detalles, qué incluye, presentación..."></textarea>
+      </label>
+
+      <label class="field">
+        <span>Detalle corto (gancho rápido)</span>
+        <input type="text" id="prodShortDetail" maxlength="90" placeholder="Ej: Acero inox 24h · Incluye mate y bombilla" />
+        <small class="muted">Frase corta según el tipo de producto para darle mayor visibilidad.</small>
       </label>
 
       <div class="field">

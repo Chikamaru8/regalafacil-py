@@ -106,6 +106,7 @@ function renderProducts(products = []) {
     const active = offerActive(p);
     const isActive = p.status === 'active';
     const cityLabel = p.attributes?.city ? String(p.attributes.city).trim() : '';
+    const shortDetail = p.attributes?.short_detail ? String(p.attributes.short_detail).trim() : '';
     const sellerId = p.attributes?.seller_id ? Number(p.attributes.seller_id) : null;
     const sellerObj = sellerId ? sellers.find((s) => Number(s.id) === sellerId) : null;
     return `
@@ -127,6 +128,7 @@ function renderProducts(products = []) {
                  <span class="price-strike">${fmtGs(p.price_gs)}</span>`
               : `<span class="price-main">${fmtGs(p.price_gs)}</span>`}
           </div>
+          ${shortDetail ? `<p class="muted" style="margin:2px 0 0;font-weight:600;">✦ ${escapeHtml(shortDetail)}</p>` : ''}
           ${active ? `<p class="muted" style="margin:2px 0 0;">Oferta hasta ${fmtDate(p.offer_ends_at)}</p>` : ''}
           ${p.description ? `<p class="muted" style="margin:4px 0 0;">${escapeHtml(p.description)}</p>` : ''}
         </div>
@@ -446,6 +448,228 @@ function renderLeads() {
   });
 }
 
+/* ---------- Asistente de carga con IA (sin API paga) ---------- */
+let aiBatchItems = [];
+let aiBatchIndex = 0;
+
+function resetAiAssistantUi() {
+  aiBatchItems = [];
+  aiBatchIndex = 0;
+  if ($('#aiPromptBox')) $('#aiPromptBox').hidden = true;
+  if ($('#aiJsonInput')) $('#aiJsonInput').value = '';
+  if ($('#aiBatchNav')) $('#aiBatchNav').hidden = true;
+  if ($('#aiHelperMsg')) $('#aiHelperMsg').textContent = '';
+}
+
+function buildAiPrompt(city, phone, sellerName) {
+  const categoriesList = (state.data?.categories || []).map((c) => c.name).join(', ') || 'General';
+  return [
+    'Analizá cada fotografía adjunta de forma 100% independiente para cargar productos en la tienda RegaláFácil PY (Paraguay).',
+    'NO mezcles datos entre fotos ni inventes precios, medidas, materiales o descripciones que no estén visibles en la imagen.',
+    'Si un precio o dato no se lee con claridad, dejalo en null o 0 y poné "requiere_revision": true.',
+    'Detectá oferta ("tiene_oferta": true) SOLO si hay dos precios claros (precio normal/tachado y precio promocional/oferta).',
+    'Identificá qué tipo de producto es y generá un "detalle_corto" breve (máximo 75 caracteres, sin párrafos largos) con el dato clave visible o propio del tipo de producto para darle mayor visibilidad.',
+    `Usá exactamente esta ciudad para todos los productos: "${city}".`,
+    `Usá exactamente este teléfono de contacto para todos los productos: "${phone}"${sellerName ? ` (Vendedor: ${sellerName})` : ''}.`,
+    `Categorías disponibles de referencia (si encaja alguna, usá su nombre): ${categoriesList}.`,
+    'Respondé ÚNICAMENTE con un JSON válido (sin texto adicional antes ni después) con esta estructura:',
+    JSON.stringify({
+      productos: [
+        {
+          nombre: 'Nombre exacto o legible del producto',
+          tipo_producto: 'Ej: Termo, Box de regalo, Perfume, Calzado',
+          detalle_corto: 'Frase corta de alto impacto (máx. 75 caracteres)',
+          descripcion: 'Descripción clara basada solo en lo visible en la foto',
+          precio: 150000,
+          tiene_oferta: false,
+          precio_anterior: null,
+          categoria: '',
+          ciudad: city,
+          telefono: phone,
+          requiere_revision: false
+        }
+      ]
+    }, null, 2)
+  ].join('\n');
+}
+
+function parseAiJsonText(rawText) {
+  let clean = String(rawText || '').trim();
+  if (!clean) throw new Error('Pegá primero el JSON que devolvió la IA.');
+
+  const fenced = clean.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced && fenced[1]) clean = fenced[1].trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(clean);
+  } catch {
+    throw new Error('El texto pegado no es un JSON válido. Revisá que no tenga texto extra o comas de más.');
+  }
+
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && Array.isArray(parsed.productos)) return parsed.productos;
+  if (parsed && typeof parsed === 'object' && (parsed.nombre || parsed.precio)) return [parsed];
+
+  throw new Error('El JSON debe contener un objeto o un arreglo "productos".');
+}
+
+function applyAiItemToForm(item) {
+  if (!item || typeof item !== 'object') return;
+
+  if (item.nombre) $('#prodName').value = String(item.nombre).trim().slice(0, 120);
+
+  const normalPrice = digitsToInt(item.precio_anterior || item.precio);
+  const promoPrice = digitsToInt(item.tiene_oferta ? item.precio : item.precio_oferta);
+
+  if (normalPrice > 0) {
+    $('#prodPrice').value = dots(normalPrice);
+  }
+  if (promoPrice > 0) {
+    $('#prodOfferPrice').value = String(promoPrice);
+  } else {
+    $('#prodOfferPrice').value = '';
+    $('#prodOfferEnds').value = '';
+  }
+
+  if (item.ciudad && $('#prodCity')) {
+    $('#prodCity').value = String(item.ciudad).trim().slice(0, 80);
+  }
+
+  if (item.descripcion) {
+    $('#prodDesc').value = String(item.descripcion).trim().slice(0, 1000);
+  }
+
+  const shortDetailInput = $('#prodShortDetail');
+  if (shortDetailInput) {
+    const sd = String(item.detalle_corto || item.detalleCorto || '').trim().slice(0, 90);
+    shortDetailInput.value = sd;
+  }
+
+  if (item.categoria && $('#prodCategory')) {
+    const targetCat = String(item.categoria).trim().toLowerCase();
+    const match = (state.data?.categories || []).find((c) => String(c.name || '').trim().toLowerCase() === targetCat);
+    if (match) $('#prodCategory').value = String(match.id);
+  }
+
+  const helper = $('#aiHelperMsg');
+  if (helper) {
+    helper.textContent = item.requiere_revision
+      ? '⚠️ Este producto quedó marcado para revisión: verificá precio, oferta o detalle antes de guardar.'
+      : '✅ Formulario autocompletado desde el JSON. Revisá y tocá Guardar.';
+  }
+}
+
+function updateAiBatchNav() {
+  const nav = $('#aiBatchNav');
+  const counter = $('#aiBatchCounter');
+  if (!nav || !counter) return;
+
+  if (aiBatchItems.length > 1) {
+    nav.hidden = false;
+    counter.textContent = `${aiBatchIndex + 1} / ${aiBatchItems.length}`;
+  } else {
+    nav.hidden = true;
+  }
+}
+
+function setupAiAssistantControls() {
+  const genBtn = $('#genAiPromptBtn');
+  if (genBtn && !genBtn.dataset.listener) {
+    genBtn.dataset.listener = 'true';
+    genBtn.addEventListener('click', () => {
+      const sellerSelect = $('#prodSeller');
+      const selectedSeller = sellerSelect?.value
+        ? (state.data?.sellers || []).find((s) => String(s.id) === String(sellerSelect.value))
+        : null;
+
+      let city = String($('#prodCity')?.value || selectedSeller?.city || '').trim();
+      if (!city) {
+        const askedCity = prompt('¿De qué ciudad son los productos que vas a cargar? (Ej: Villa Elisa, Asunción)');
+        if (askedCity === null) return;
+        city = askedCity.trim();
+        if (!city) {
+          alert('Necesitás ingresar una ciudad para generar el prompt.');
+          return;
+        }
+        if ($('#prodCity')) $('#prodCity').value = city;
+      }
+
+      const defaultPhone = selectedSeller?.phone || state.data?.settings?.business?.default_phone || '';
+      let phone = String(defaultPhone || '').trim();
+      if (!phone) {
+        const askedPhone = prompt('¿Cuál es el número de teléfono del vendedor para estos productos? (Ej: 0981 123 456)');
+        if (askedPhone === null) return;
+        phone = askedPhone.trim();
+        if (!phone) {
+          alert('Necesitás ingresar un número de teléfono para generar el prompt.');
+          return;
+        }
+      }
+
+      const promptText = buildAiPrompt(city, phone, selectedSeller?.name || '');
+      $('#aiPromptOutput').value = promptText;
+      $('#aiPromptBox').hidden = false;
+      $('#aiHelperMsg').textContent = 'Prompt generado con ciudad y teléfono. Copialo y adjuntá las fotos en tu IA.';
+    });
+  }
+
+  const copyBtn = $('#copyAiPromptBtn');
+  if (copyBtn && !copyBtn.dataset.listener) {
+    copyBtn.dataset.listener = 'true';
+    copyBtn.addEventListener('click', async () => {
+      const txt = $('#aiPromptOutput')?.value || '';
+      if (!txt) return;
+      try {
+        await navigator.clipboard.writeText(txt);
+        $('#aiHelperMsg').textContent = '📋 Prompt copiado al portapapeles.';
+      } catch {
+        $('#aiPromptOutput').select();
+        document.execCommand('copy');
+        $('#aiHelperMsg').textContent = '📋 Prompt seleccionado/copiado.';
+      }
+    });
+  }
+
+  const applyBtn = $('#applyAiJsonBtn');
+  if (applyBtn && !applyBtn.dataset.listener) {
+    applyBtn.dataset.listener = 'true';
+    applyBtn.addEventListener('click', () => {
+      try {
+        const items = parseAiJsonText($('#aiJsonInput')?.value || '');
+        aiBatchItems = items;
+        aiBatchIndex = 0;
+        updateAiBatchNav();
+        applyAiItemToForm(aiBatchItems[0]);
+      } catch (err) {
+        $('#aiHelperMsg').textContent = `❌ ${err.message}`;
+      }
+    });
+  }
+
+  const prevBtn = $('#aiPrevBtn');
+  if (prevBtn && !prevBtn.dataset.listener) {
+    prevBtn.dataset.listener = 'true';
+    prevBtn.addEventListener('click', () => {
+      if (!aiBatchItems.length) return;
+      aiBatchIndex = (aiBatchIndex - 1 + aiBatchItems.length) % aiBatchItems.length;
+      updateAiBatchNav();
+      applyAiItemToForm(aiBatchItems[aiBatchIndex]);
+    });
+  }
+
+  const nextBtn = $('#aiNextBtn');
+  if (nextBtn && !nextBtn.dataset.listener) {
+    nextBtn.dataset.listener = 'true';
+    nextBtn.addEventListener('click', () => {
+      if (!aiBatchItems.length) return;
+      aiBatchIndex = (aiBatchIndex + 1) % aiBatchItems.length;
+      updateAiBatchNav();
+      applyAiItemToForm(aiBatchItems[aiBatchIndex]);
+    });
+  }
+}
+
 /* ---------- Formulario de producto ---------- */
 function populateFormOptions() {
   const cats = state.data?.categories || [];
@@ -491,6 +715,8 @@ function populateFormOptions() {
     const sortedCities = Array.from(citiesSet).sort((a, b) => a.localeCompare(b, 'es'));
     cityDatalist.innerHTML = sortedCities.map((c) => `<option value="${escapeHtml(c)}"></option>`).join('');
   }
+
+  setupAiAssistantControls();
 }
 
 /* ============================================================
@@ -752,6 +978,7 @@ function openProductModal(prod = null) {
   state.selectedFile = null;
   $('#prodImageFile').value = '';
   $('#productFormError').hidden = true;
+  resetAiAssistantUi();
 
   let variants = [];
   try {
@@ -785,6 +1012,8 @@ function openProductModal(prod = null) {
     const cityInput = $('#prodCity');
     if (cityInput) cityInput.value = prod.attributes?.city || '';
     $('#prodDesc').value = prod.description || '';
+    const shortDetailInput = $('#prodShortDetail');
+    if (shortDetailInput) shortDetailInput.value = prod.attributes?.short_detail || '';
     $('#deleteProductBtn').hidden = false;
 
     const selectedTags = new Set(prod.tag_ids || []);
@@ -800,6 +1029,8 @@ function openProductModal(prod = null) {
     if (sellerSelect) sellerSelect.value = '';
     const cityInput = $('#prodCity');
     if (cityInput) cityInput.value = '';
+    const shortDetailInput = $('#prodShortDetail');
+    if (shortDetailInput) shortDetailInput.value = '';
     mainPhotoId = null;
     galleryImagesList = [];
     productVariants = [];
@@ -918,7 +1149,21 @@ $('#productForm').addEventListener('submit', async (e) => {
       .filter((v) => v.name);
 
     const cityVal = String($('#prodCity')?.value || '').trim().slice(0, 80);
+    const shortDetailVal = String($('#prodShortDetail')?.value || '').trim().slice(0, 90);
     const sellerIdVal = $('#prodSeller')?.value ? Number($('#prodSeller').value) : null;
+    const baseAttrs = state.editingProduct?.attributes && typeof state.editingProduct.attributes === 'object'
+      ? { ...state.editingProduct.attributes }
+      : {};
+    const nextAttrs = {
+      ...baseAttrs,
+      colors,
+      ...(cityVal ? { city: cityVal } : {}),
+      ...(shortDetailVal ? { short_detail: shortDetailVal } : {}),
+      ...(sellerIdVal ? { seller_id: sellerIdVal } : {})
+    };
+    if (!cityVal) delete nextAttrs.city;
+    if (!shortDetailVal) delete nextAttrs.short_detail;
+    if (!sellerIdVal) delete nextAttrs.seller_id;
 
     let targetId = idVal;
 
@@ -932,6 +1177,7 @@ $('#productForm').addEventListener('submit', async (e) => {
         status: $('#prodStatus').value,
         seller_id: sellerIdVal,
         city: cityVal,
+        attributes: nextAttrs,
         description: $('#prodDesc').value.trim(),
         tag_ids: tagIds,
         colors: JSON.stringify(colors)
@@ -973,6 +1219,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       status: $('#prodStatus').value,
       seller_id: sellerIdVal,
       city: cityVal,
+      attributes: nextAttrs,
       description: $('#prodDesc').value.trim(),
       tag_ids: tagIds,
       image_ids: finalImageIds,
