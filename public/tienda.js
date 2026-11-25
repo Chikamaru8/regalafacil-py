@@ -168,7 +168,9 @@ async function initCatalog() {
   renderCategories();
   renderCities();
   renderProducts();
-  lucide.createIcons();
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
 
   // Abrir automaticamente si viene con parametro ?p=ID
   const urlParams = new URLSearchParams(location.search);
@@ -271,7 +273,9 @@ function renderProducts() {
     `;
   }).join("");
 
-  lucide.createIcons();
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
 }
 
 function esc(s) {
@@ -377,7 +381,9 @@ function openProductModal(id) {
 
   document.getElementById("productModal").classList.remove("hidden");
   document.body.style.overflow = "hidden";
-  lucide.createIcons();
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
 }
 
 function updateModalImageDisplay() {
@@ -471,7 +477,9 @@ function openGiftAssistant() {
   goToWizardStep(1);
   document.getElementById("giftModal").classList.remove("hidden");
   document.body.style.overflow = "hidden";
-  lucide.createIcons();
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
 }
 
 function closeGiftAssistant() {
@@ -485,7 +493,9 @@ function goToWizardStep(step) {
   document.getElementById("wizardStep3").classList.toggle("hidden", step !== 3);
   document.getElementById("stepIndicator").textContent = `Paso ${step} de 3`;
   document.getElementById("wizardProgress").style.width = `${(step / 3) * 100}%`;
-  lucide.createIcons();
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
 }
 
 function selectRecipient(rec) {
@@ -520,7 +530,7 @@ function finishGiftAssistant(budget) {
   renderProducts();
 }
 
-// ---------- Regalito Bot (globo inteligente) ----------
+// ---------- Regalito Bot (saludo inicial + consulta predeterminada) ----------
 let bubbleTimer = null;
 let greetingSwitchTimer = null;
 
@@ -569,3 +579,13 @@ window.addEventListener("load", () => {
 window.addEventListener("scroll", () => {
   if (window.scrollY > 180) hideRegalitoBubble();
 }, { passive: true });
+
+document.addEventListener("DOMContentLoaded", () => {
+  const waBtn = document.getElementById("modalWhatsappBtn");
+  if (waBtn) {
+    waBtn.addEventListener("click", () => {
+      if (currentProduct && pendingRef) registerLead(pendingRef, currentProduct);
+    });
+  }
+  initCatalog();
+});
