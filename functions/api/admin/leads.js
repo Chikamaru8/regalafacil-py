@@ -18,3 +18,16 @@ export async function onRequestPut({ request, env }) {
   if (!res.meta?.changes) return Response.json({ error: 'Pedido no encontrado' }, { status: 404 });
   return Response.json({ ok: true });
 }
+
+export async function onRequestDelete({ request, env }) {
+  const id = Number(new URL(request.url).searchParams.get('id'));
+  if (!id) return Response.json({ error: 'ID requerido' }, { status: 400 });
+
+  const [, delLead] = await env.DB.batch([
+    env.DB.prepare('DELETE FROM lead_item WHERE lead_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM lead WHERE id = ?').bind(id)
+  ]);
+
+  if (!delLead.meta?.changes) return Response.json({ error: 'Pedido no encontrado' }, { status: 404 });
+  return Response.json({ ok: true });
+}
