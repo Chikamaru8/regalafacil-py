@@ -70,9 +70,8 @@
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </span>
-        <span class="text-slate-200 font-medium">Atención directa por WhatsApp</span>
+        <span class="text-slate-200 font-medium">Atención directa por WhatsApp con cada tienda</span>
       </div>
-      <span id="topTel" class="font-mono text-emerald-400 font-semibold">+595 994 354894</span>
     </div>
   </div>
 
@@ -204,13 +203,14 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
+          <label for="citySelect" class="text-[11px] font-semibold text-slate-500">Filtrar por ciudad:</label>
           <div class="relative">
             <select
               id="citySelect"
               onchange="handleCityFilter(this.value)"
               class="appearance-none bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-semibold rounded-xl pl-3 pr-8 py-2 focus:outline-none focus:border-brand-500 cursor-pointer transition"
             >
-              <option value="">Ciudad: Todas</option>
+              <option value="">Todas las ciudades</option>
             </select>
             <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
           </div>
@@ -238,36 +238,18 @@
 
       <div id="emptyState" class="hidden py-14 px-4 text-center space-y-3 bg-white rounded-3xl border border-slate-200/70">
         <div class="w-14 h-14 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-          <i data-lucide="message-square-code" class="w-7 h-7"></i>
+          <i data-lucide="search-x" class="w-7 h-7"></i>
         </div>
         <h4 class="font-display font-bold text-slate-800 text-sm sm:text-base">No encontramos un producto exacto para esa combinación</h4>
-        <p class="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">Pero no te preocupes, podemos verificar stock en nuestro depósito o sugerirte alternativas similares.</p>
+        <p class="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">Probá quitando algún filtro o viendo todo el catálogo disponible.</p>
         <div class="pt-2 flex flex-col sm:flex-row gap-2.5 justify-center">
           <button onclick="resetAllFilters()" class="py-2.5 px-5 rounded-xl bg-slate-900 text-white text-xs font-bold cursor-pointer">
             Ver todo el catálogo
           </button>
-          <a id="consultStockBtn" href="#" target="_blank" rel="noopener noreferrer" class="py-2.5 px-5 rounded-xl bg-whatsapp-500 text-white text-xs font-bold flex items-center justify-center gap-1.5">
-            <i data-lucide="message-circle" class="w-4 h-4"></i> Consultar por WhatsApp
-          </a>
         </div>
       </div>
     </main>
 
-  </div>
-
-  <!-- BOTÓN FLOTANTE WHATSAPP (ESQUINA INFERIOR IZQUIERDA) -->
-  <div class="fixed bottom-5 left-4 sm:left-6 z-30">
-    <a 
-      id="fabBtn"
-      href="#" 
-      target="_blank" 
-      rel="noopener noreferrer"
-      aria-label="Consultar por WhatsApp"
-      class="flex items-center gap-2 bg-whatsapp-500 hover:bg-whatsapp-600 text-white p-3.5 sm:pl-4 sm:pr-5 rounded-full shadow-lg shadow-emerald-600/30 transition transform active:scale-95"
-    >
-      <i data-lucide="message-circle" class="w-5 h-5 fill-white text-whatsapp-500"></i>
-      <span class="hidden sm:inline text-xs sm:text-sm font-bold tracking-tight">¿Dudas? Escribinos</span>
-    </a>
   </div>
 
   <!-- REGALITO BOT ESCRITORIO (ESQUINA INFERIOR DERECHA CON GLOBO DE DIÁLOGO) -->
@@ -297,7 +279,7 @@
   </div>
 
   <!-- ===================================================================== -->
-  <!-- MODAL 1: FICHA DE PRODUCTO CON SELECTOR DE COLOR Y LINK DIRECTO -->
+  <!-- MODAL 1: FICHA DE PRODUCTO CON LINK DIRECTO -->
   <!-- ===================================================================== -->
   <div id="productModal" class="fixed inset-0 z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div onclick="closeProductModal()" class="absolute inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"></div>
@@ -349,7 +331,7 @@
   </div>
 
   <!-- ===================================================================== -->
-  <!-- MODAL 2: ASISTENTE DE REGALOS -->
+  <!-- MODAL 2: ASISTENTE DE REGALOS (CONECTADO A ETIQUETAS: PARA QUIÉN / OCASIÓN / EDAD) -->
   <!-- ===================================================================== -->
   <div id="giftModal" class="fixed inset-0 z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div onclick="closeGiftAssistant()" class="absolute inset-0 bg-slate-950/65 backdrop-blur-xs"></div>
@@ -361,7 +343,7 @@
           <span class="text-lg">🎁</span>
           <div>
             <h3 class="font-display font-extrabold text-base text-slate-900">Asistente de Regalos</h3>
-            <p id="stepIndicator" class="text-[11px] font-semibold text-brand-600">Paso 1 de 3</p>
+            <p id="stepIndicator" class="text-[11px] font-semibold text-brand-600">Paso 1 de 4</p>
           </div>
         </div>
         <button onclick="closeGiftAssistant()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition cursor-pointer">
@@ -370,82 +352,39 @@
       </div>
 
       <div class="w-full bg-slate-100 h-1.5 shrink-0">
-        <div id="wizardProgress" class="bg-brand-600 h-1.5 transition-all duration-300" style="width: 33.33%"></div>
+        <div id="wizardProgress" class="bg-brand-600 h-1.5 transition-all duration-300" style="width: 25%"></div>
       </div>
 
       <div class="p-5 overflow-y-auto flex-1">
-        <!-- PASO 1 -->
+        <!-- PASO 1: PARA QUIÉN -->
         <div id="wizardStep1" class="space-y-3 animate-pop">
           <h4 class="font-display font-bold text-base sm:text-lg text-slate-900">¿Para quién estás buscando el regalo?</h4>
-          <p class="text-xs text-slate-500">Elegí una opción para filtrar ideas pensadas para esa persona.</p>
-          
-          <div class="grid grid-cols-2 gap-2.5 pt-2">
-            <button onclick="selectRecipient('Mujer')" class="p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex flex-col gap-1 active:scale-95 cursor-pointer">
-              <span class="text-2xl">👩</span>
-              <span class="font-display font-bold text-xs sm:text-sm text-slate-800">Mujer</span>
-              <span class="text-[10px] text-slate-500">Amiga, mamá, hermana</span>
-            </button>
-            <button onclick="selectRecipient('Hombre')" class="p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex flex-col gap-1 active:scale-95 cursor-pointer">
-              <span class="text-2xl">👨</span>
-              <span class="font-display font-bold text-xs sm:text-sm text-slate-800">Hombre</span>
-              <span class="text-[10px] text-slate-500">Amigo, papá, compañero</span>
-            </button>
-            <button onclick="selectRecipient('Pareja')" class="p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex flex-col gap-1 active:scale-95 cursor-pointer">
-              <span class="text-2xl">❤️</span>
-              <span class="font-display font-bold text-xs sm:text-sm text-slate-800">Pareja</span>
-              <span class="text-[10px] text-slate-500">Novio/a, esposo/a</span>
-            </button>
-            <button onclick="selectRecipient('Amigo/a')" class="p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex flex-col gap-1 active:scale-95 cursor-pointer">
-              <span class="text-2xl">🤝</span>
-              <span class="font-display font-bold text-xs sm:text-sm text-slate-800">Amigo/a o Trabajo</span>
-              <span class="text-[10px] text-slate-500">Cumpleaños, amigo secreto</span>
-            </button>
-            <button onclick="selectRecipient('Niño/a')" class="col-span-2 p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex items-center gap-3 active:scale-95 cursor-pointer">
-              <span class="text-2xl">🧸</span>
-              <div>
-                <span class="font-display font-bold text-xs sm:text-sm text-slate-800 block">Niño o Niña</span>
-                <span class="text-[10px] text-slate-500">Detalles divertidos y prácticos</span>
-              </div>
-            </button>
-          </div>
+          <p class="text-xs text-slate-500">Filtramos según las etiquetas de cada producto.</p>
+          <div id="wizardRecipientOptions" class="grid grid-cols-2 gap-2.5 pt-2"></div>
         </div>
 
-        <!-- PASO 2 -->
+        <!-- PASO 2: OCASIÓN -->
         <div id="wizardStep2" class="hidden space-y-3 animate-pop">
           <h4 class="font-display font-bold text-base sm:text-lg text-slate-900">¿Qué ocasión es?</h4>
-          <p class="text-xs text-slate-500">Esto nos ayuda a ajustar el estilo del regalo.</p>
-          
-          <div class="space-y-2.5 pt-2">
-            <button onclick="selectOccasion('Cumpleaños')" class="w-full p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex items-center justify-between active:scale-[0.98] cursor-pointer">
-              <div>
-                <span class="font-display font-bold text-xs sm:text-sm text-slate-800 block">🎂 Cumpleaños</span>
-                <span class="text-[10px] text-slate-500">Festejos y sorpresas especiales</span>
-              </div>
-              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-            </button>
-            <button onclick="selectOccasion('Aniversario')" class="w-full p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex items-center justify-between active:scale-[0.98] cursor-pointer">
-              <div>
-                <span class="font-display font-bold text-xs sm:text-sm text-slate-800 block">💖 Aniversario / Pareja</span>
-                <span class="text-[10px] text-slate-500">Detalles románticos y memorables</span>
-              </div>
-              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-            </button>
-            <button onclick="selectOccasion('Detalle libre')" class="w-full p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex items-center justify-between active:scale-[0.98] cursor-pointer">
-              <div>
-                <span class="font-display font-bold text-xs sm:text-sm text-slate-800 block">✨ Porque sí / Otro</span>
-                <span class="text-[10px] text-slate-500">Novedades y sorpresas cotidianas</span>
-              </div>
-              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-            </button>
-          </div>
-
+          <p class="text-xs text-slate-500">Elegí la ocasión o saltá este paso para ver más opciones.</p>
+          <div id="wizardOccasionOptions" class="space-y-2.5 pt-2"></div>
           <button onclick="goToWizardStep(1)" class="mt-3 text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
             <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Volver al paso anterior
           </button>
         </div>
 
-        <!-- PASO 3 -->
+        <!-- PASO 3: EDAD -->
         <div id="wizardStep3" class="hidden space-y-3 animate-pop">
+          <h4 class="font-display font-bold text-base sm:text-lg text-slate-900">¿Qué edad aproximada tiene?</h4>
+          <p class="text-xs text-slate-500">Así afinamos mejor las recomendaciones.</p>
+          <div id="wizardAgeOptions" class="grid grid-cols-2 gap-2.5 pt-2"></div>
+          <button onclick="goToWizardStep(2)" class="mt-3 text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
+            <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Volver al paso anterior
+          </button>
+        </div>
+
+        <!-- PASO 4: PRESUPUESTO -->
+        <div id="wizardStep4" class="hidden space-y-3 animate-pop">
           <h4 class="font-display font-bold text-base sm:text-lg text-slate-900">¿Cuánto pensás gastar aproximadamente?</h4>
           <p class="text-xs text-slate-500">Te mostraremos las mejores opciones disponibles.</p>
           
@@ -464,16 +403,16 @@
               </div>
               <span class="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg">Ideal</span>
             </button>
-            <button onclick="finishGiftAssistant(9999999)" class="w-full p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex items-center justify-between active:scale-[0.98] cursor-pointer">
+            <button onclick="finishGiftAssistant(0)" class="w-full p-3.5 rounded-2xl border-2 border-slate-100 hover:border-brand-500 bg-slate-50 text-left transition flex items-center justify-between active:scale-[0.98] cursor-pointer">
               <div>
-                <span class="font-display font-bold text-xs sm:text-sm text-slate-800 block">Más de Gs. 200.000</span>
-                <span class="text-[10px] text-slate-500">Regalos premium para lucirse</span>
+                <span class="font-display font-bold text-xs sm:text-sm text-slate-800 block">Sin límite de presupuesto</span>
+                <span class="text-[10px] text-slate-500">Ver todas las opciones que coincidan</span>
               </div>
-              <span class="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg">Premium</span>
+              <span class="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg">Todos</span>
             </button>
           </div>
 
-          <button onclick="goToWizardStep(2)" class="mt-3 text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
+          <button onclick="goToWizardStep(3)" class="mt-3 text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
             <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Volver al paso anterior
           </button>
         </div>
