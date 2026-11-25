@@ -73,22 +73,25 @@ function buildWhatsAppUrl(product, price, ref) {
 
   let message = `¡Hola${sellerName}! Me interesa este producto de *${BRAND_NAME}*:\n\n`;
   message += `🔍 Ref: *#${ref}*\n`;
-  message += `🛍️ *${product.name}*\n`;
+  message += `🛍️ Producto: *${product.name}*\n`;
   message += `💰 Precio: *${formatGs(price)}*\n`;
 
   if (product.description && String(product.description).trim()) {
-    message += `📝 Descripción: ${String(product.description).trim()}\n`;
+    message += `📝 Detalle: ${String(product.description).trim()}\n`;
   }
 
   if (selectedColor) {
-    message += `🎨 Color/Variante: *${selectedColor}*\n`;
-  } else if (colors.length > 0) {
-    message += `🎨 Variantes disponibles: ${colors.map(c => c.name).join(", ")}\n`;
+    message += `🎨 Variante disponible: *${selectedColor}*\n`;
+  } else if (colors.length === 1) {
+    message += `🎨 Variante disponible: *${colors[0].name}*\n`;
+  } else if (colors.length > 1) {
+    message += `🎨 Opciones del producto: *${colors.map(c => c.name).join(", ")}*\n`;
   }
 
   if (state.giftContext) {
     message += `🎁 Ocasión: *${state.giftContext.recipient}* (${state.giftContext.occasion})\n`;
   }
+
   message += `\n🔗 Ver producto: ${productUrl}\n\n`;
   message += `¿Tienen disponibilidad y cómo coordinamos?`;
 
@@ -327,42 +330,7 @@ function openProductModal(id) {
   document.getElementById("modalTitle").textContent = p.name;
   document.getElementById("modalPrice").textContent = formatGs(price);
 
-  
-
   selectedColor = "";
-
-  /*
-  const colors = getColorObjects(p);
-  const colorContainer = document.getElementById("colorOptions");
-
-  if (colors.length > 0) {
-    colorContainer.innerHTML = colors.map((col, idx) => `
-      <button type="button" data-name="${esc(col.name)}" class="color-btn px-3 py-1.5 rounded-xl text-xs font-semibold border ${idx === 0 ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-700'} transition cursor-pointer">
-        ${esc(col.name)}
-      </button>
-    `).join("");
-
-    colorContainer.querySelectorAll(".color-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const colorName = btn.dataset.name;
-        selectColor(colorName, btn);
-
-        const matchedColorObj = colors.find(c => c.name === colorName);
-        if (matchedColorObj && matchedColorObj.image_id) {
-          setActiveImage(matchedColorObj.image_id);
-        }
-      });
-    });
-    selectedColor = colors[0].name;
-
-    if (colors[0].image_id) {
-      setActiveImage(colors[0].image_id);
-    }
-  } else {
-    colorContainer.innerHTML = '<span class="text-xs text-slate-400">Modelo único</span>';
-    selectedColor = "";
-  }
-  */
 
   updateModalWhatsappButton();
 
@@ -499,13 +467,7 @@ function finishGiftAssistant(budget) {
   renderProducts();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  // Al tocar "Me interesa" se registra el pedido con el mismo codigo que lleva el mensaje
-  document.getElementById("modalWhatsappBtn").addEventListener("click", () => {
-    if (currentProduct && pendingRef) registerLead(pendingRef, currentProduct);
-  });
-  initCatalog();
-  // ---------- Regalito Bot (globo inteligente) ----------
+// ---------- Regalito Bot (globo inteligente) ----------
 let bubbleTimer = null;
 
 function showRegalitoBubble() {
@@ -513,7 +475,6 @@ function showRegalitoBubble() {
   if (!bubble) return;
   bubble.classList.remove("hidden");
 
-  // Se oculta solo después de 8 segundos para no estorbar
   clearTimeout(bubbleTimer);
   bubbleTimer = setTimeout(hideRegalitoBubble, 12000);
 }
@@ -524,7 +485,6 @@ function hideRegalitoBubble() {
   clearTimeout(bubbleTimer);
 }
 
-// Aparece 1.5s después de cargar y se oculta si el usuario baja mucho por el catálogo
 window.addEventListener("load", () => {
   setTimeout(showRegalitoBubble, 1500);
 });
@@ -532,4 +492,11 @@ window.addEventListener("load", () => {
 window.addEventListener("scroll", () => {
   if (window.scrollY > 180) hideRegalitoBubble();
 }, { passive: true });
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Al tocar "Me interesa" se registra el pedido con el mismo codigo que lleva el mensaje
+  document.getElementById("modalWhatsappBtn").addEventListener("click", () => {
+    if (currentProduct && pendingRef) registerLead(pendingRef, currentProduct);
+  });
+  initCatalog();
 });
