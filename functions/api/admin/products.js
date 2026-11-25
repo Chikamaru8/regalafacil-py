@@ -45,6 +45,8 @@ function clean(b) {
   const validColors = colorsParsed.filter(c => c && typeof c.name === 'string' && c.name.trim() !== '');
   const baseAttrs = b.attributes && typeof b.attributes === 'object' ? { ...b.attributes } : {};
   const city = String(b.city ?? baseAttrs.city ?? '').trim().slice(0, 80);
+  const rawSellerId = b.seller_id !== undefined ? b.seller_id : baseAttrs.seller_id;
+  const sellerId = Number(rawSellerId);
 
   const nextAttrs = {
     ...baseAttrs,
@@ -54,6 +56,11 @@ function clean(b) {
     nextAttrs.city = city;
   } else {
     delete nextAttrs.city;
+  }
+  if (Number.isInteger(sellerId) && sellerId > 0) {
+    nextAttrs.seller_id = sellerId;
+  } else {
+    delete nextAttrs.seller_id;
   }
 
   return {

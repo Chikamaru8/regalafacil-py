@@ -8,7 +8,30 @@ let currentActiveImageId = null; // Controla la foto activa mostrada en el modal
 
 const formatGs = amount => "Gs. " + Number(amount || 0).toLocaleString('es-PY');
 const IMG_VER = Date.now();
-const getPhone = () => String(appData.seller?.phone || appData.settings.business?.default_phone || "595994354894").replace(/\D/g, "");
+
+function normalizePhone(phone) {
+  let d = String(phone || "").replace(/\D/g, "");
+  if (!d) return "";
+  if (d.startsWith("0")) d = "595" + d.slice(1);
+  return d;
+}
+
+const getPhone = () =>
+  normalizePhone(appData.seller?.phone || appData.settings.business?.default_phone || "595994354894");
+
+function getProductSeller(product) {
+  const sellerId = product?.seller_id || product?.attributes?.seller_id;
+  if (sellerId) {
+    const found = (appData.sellers || []).find(s => Number(s.id) === Number(sellerId));
+    if (found) return found;
+  }
+  return appData.seller || null;
+}
+
+function getProductPhone(product) {
+  const owner = getProductSeller(product);
+  return normalizePhone(owner?.phone || appData.settings.business?.default_phone || "595994354894");
+}
 
 // ---------- Almacenamiento local seguro ----------
 const ls = {
@@ -27,7 +50,7 @@ const ls = {
   }
 };
 
-// Vendedor por enlace (?v=slug), guardado 30 dias
+// Vendedor por enlace (?v=slug), guardado 30 dias (respaldo si el producto no tiene dueño asignado)
 let vslug = new URLSearchParams(location.search).get('v');
 if (vslug) {
   ls.set('seller', { slug: vslug, t: Date.now() });
@@ -67,7 +90,8 @@ function getColorObjects(p) {
 
 // ---------- WhatsApp y registro del pedido ----------
 function buildWhatsAppUrl(product, price, ref) {
-  const sellerName = appData.seller?.name ? ` (${appData.seller.name})` : "";
+  const owner = getProductSeller(product);
+  const sellerName = owner?.name ? ` (${owner.name})` : "";
   const productUrl = window.location.origin + window.location.pathname + `?p=${product.id}`;
   const colors = getColorObjects(product);
 
@@ -95,19 +119,20 @@ function buildWhatsAppUrl(product, price, ref) {
   message += `\n🔗 Ver producto: ${productUrl}\n\n`;
   message += `¿Tienen disponibilidad y cómo coordinamos?`;
 
-  return `https://wa.me/${getPhone()}?text=${encodeURIComponent(message)}`;
+  return `https://wa.me/${getProductPhone(product)}?text=${encodeURIComponent(message)}`;
 }
 
 // El servidor toma nombre, precio y vendedor de la base: aqui solo van ids y cantidad
 function registerLead(ref, product) {
   try {
+    const owner = getProductSeller(product);
     fetch('/api/leads', {
       method: 'POST',
       keepalive: true,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ref,
-        seller_slug: vslug || '',
+        seller_slug: owner?.slug || vslug || '',
         visitor_id: getVisitorId(),
         items: [{ product_id: product.id, qty: 1 }]
       })
@@ -195,11 +220,23 @@ async function initCatalog() {
 function renderCategories() {
   const container = document.getElementById("categoryFilters");
   if (!container) return;
+
+  // Solo mostrar categorías que tengan al menos un producto disponible
+  const activeCatIds = new Set(
+    (appData.products || [])
+      .map(p => p.category_id)
+      .filter(id => id != null && id !== "")
+      .map(id => String(id))
+  );
+
   let html = `<button onclick="setCategoryFilter('', this)" class="cat-chip active shrink-0 px-3.5 py-2 rounded-2xl text-xs font-bold bg-brand-600 text-white shadow-sm shadow-brand-500/20 flex items-center gap-1.5 transition cursor-pointer"><span>🔥</span> Todo</button>`;
 
-  (appData.categories || []).forEach(c => {
-    html += `<button onclick="setCategoryFilter('${c.id}', this)" class="cat-chip shrink-0 px-3.5 py-2 rounded-2xl text-xs font-semibold bg-white text-slate-700 border border-slate-200/90 hover:border-slate-300 flex items-center gap-1.5 transition cursor-pointer"><span>📁</span> ${esc(c.name)}</button>`;
-  });
+  (appData.categories || [])
+    .filter(c => activeCatIds.has(String(c.id)))
+    .forEach(c => {
+      html += `<button onclick="setCategoryFilter('${c.id}', this)" class="cat-chip shrink-0 px-3.5 py-2 rounded-2xl text-xs font-semibold bg-white text-slate-700 border border-slate-200/90 hover:border-slate-300 flex items-center gap-1.5 transition cursor-pointer"><span>📁</span> ${esc(c.name)}</button>`;
+    });
+
   container.innerHTML = html;
 }
 

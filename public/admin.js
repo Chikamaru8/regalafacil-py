@@ -97,12 +97,16 @@ function renderProducts(products = []) {
     return;
   }
 
+  const sellers = state.data?.sellers || [];
+
   list.innerHTML = products.map((p) => {
     const firstImgId = p.image_ids?.[0];
     const imgSrc = firstImgId ? imgUrl(firstImgId) : '';
     const active = offerActive(p);
     const isActive = p.status === 'active';
     const cityLabel = p.attributes?.city ? String(p.attributes.city).trim() : '';
+    const sellerId = p.attributes?.seller_id ? Number(p.attributes.seller_id) : null;
+    const sellerObj = sellerId ? sellers.find((s) => Number(s.id) === sellerId) : null;
     return `
       <article class="card">
         ${imgSrc
@@ -111,7 +115,8 @@ function renderProducts(products = []) {
         <div class="card-body">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <h3 class="card-title">${escapeHtml(p.name)}</h3>
-            <span class="pill ${isActive ? 'pill-ok' : 'pill-warn'}">${isActive ? 'Activo' : 'Pausado'}</span>
+            <span class="pill ${isActive ? 'pill-ok' : 'pill-warn'}">${isActive ? 'Disponible' : 'Agotado'}</span>
+            ${sellerObj ? `<span class="pill">👤 ${escapeHtml(sellerObj.name)}</span>` : ''}
             ${cityLabel ? `<span class="pill">${escapeHtml(cityLabel)}</span>` : ''}
             ${offerExpired(p) ? '<span class="pill pill-warn">Oferta vencida</span>' : ''}
           </div>
@@ -253,6 +258,23 @@ function populateFormOptions() {
       <span>${escapeHtml(t.label)}</span>
     </label>
   `).join('');
+
+  const sellerSelect = $('#prodSeller');
+  if (sellerSelect) {
+    const sellers = state.data?.sellers || [];
+    sellerSelect.innerHTML = `<option value="">Administrador (por defecto)</option>` +
+      sellers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}${s.city ? ' — ' + escapeHtml(s.city) : ''}</option>`).join('');
+
+    if (!sellerSelect.dataset.listener) {
+      sellerSelect.dataset.listener = 'true';
+      sellerSelect.addEventListener('change', () => {
+        const cityInput = $('#prodCity');
+        if (!cityInput || cityInput.value.trim()) return;
+        const selected = (state.data?.sellers || []).find((s) => String(s.id) === String(sellerSelect.value));
+        if (selected?.city) cityInput.value = selected.city;
+      });
+    }
+  }
 
   const cityDatalist = $('#prodCityOptions');
   if (cityDatalist) {
@@ -557,6 +579,8 @@ function openProductModal(prod = null) {
     $('#prodOfferEnds').value = offerActive(prod) ? toLocalInput(prod.offer_ends_at) : '';
     $('#prodCategory').value = prod.category_id || '';
     $('#prodStatus').value = prod.status || 'active';
+    const sellerSelect = $('#prodSeller');
+    if (sellerSelect) sellerSelect.value = prod.attributes?.seller_id ? String(prod.attributes.seller_id) : '';
     const cityInput = $('#prodCity');
     if (cityInput) cityInput.value = prod.attributes?.city || '';
     $('#prodDesc').value = prod.description || '';
@@ -571,6 +595,8 @@ function openProductModal(prod = null) {
     $('#productForm').reset();
     $('#prodId').value = '';
     $('#prodStatus').value = 'active';
+    const sellerSelect = $('#prodSeller');
+    if (sellerSelect) sellerSelect.value = '';
     const cityInput = $('#prodCity');
     if (cityInput) cityInput.value = '';
     mainPhotoId = null;
@@ -691,6 +717,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       .filter((v) => v.name);
 
     const cityVal = String($('#prodCity')?.value || '').trim().slice(0, 80);
+    const sellerIdVal = $('#prodSeller')?.value ? Number($('#prodSeller').value) : null;
 
     let targetId = idVal;
 
@@ -702,6 +729,7 @@ $('#productForm').addEventListener('submit', async (e) => {
         offer_ends_at: offerEnds,
         category_id: $('#prodCategory').value ? Number($('#prodCategory').value) : null,
         status: $('#prodStatus').value,
+        seller_id: sellerIdVal,
         city: cityVal,
         description: $('#prodDesc').value.trim(),
         tag_ids: tagIds,
@@ -742,6 +770,7 @@ $('#productForm').addEventListener('submit', async (e) => {
       offer_ends_at: offerEnds,
       category_id: $('#prodCategory').value ? Number($('#prodCategory').value) : null,
       status: $('#prodStatus').value,
+      seller_id: sellerIdVal,
       city: cityVal,
       description: $('#prodDesc').value.trim(),
       tag_ids: tagIds,

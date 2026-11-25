@@ -30,13 +30,6 @@ export async function onRequestGet({ request, env, waitUntil }) {
   const nums = (s) => (s ? s.split(',').map(Number) : []);
 
   const sellersList = allSellers.results || [];
-  const citiesList = Array.from(
-    new Set(
-      sellersList
-        .map((s) => String(s.city || '').trim())
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b, 'es'));
 
   // Agrupar las imágenes por producto mapeando ID y color_key
   const imagesByProduct = {};
@@ -48,6 +41,32 @@ export async function onRequestGet({ request, env, waitUntil }) {
     });
   }
 
+  const productsList = prod.results.map((p) => {
+    const attrs = parse(p.attributes);
+    const productImages = imagesByProduct[p.id] || [];
+    return {
+      ...p,
+      attributes: attrs,
+      seller_id: attrs.seller_id ? Number(attrs.seller_id) : null,
+      colors: attrs.colors || [],
+      images: productImages,
+      image_ids: productImages.map(img => img.id),
+      tag_ids: nums(p.tag_ids)
+    };
+  });
+
+  // Unificar ciudades de vendedores y de productos sin duplicados
+  const citiesMap = new Map();
+  for (const s of sellersList) {
+    const c = String(s.city || '').trim();
+    if (c) citiesMap.set(c.toLowerCase(), c);
+  }
+  for (const p of productsList) {
+    const c = String(p.attributes?.city || '').trim();
+    if (c) citiesMap.set(c.toLowerCase(), c);
+  }
+  const citiesList = Array.from(citiesMap.values()).sort((a, b) => a.localeCompare(b, 'es'));
+
   const body = JSON.stringify({
     settings,
     seller: sel.results[0] || null,
@@ -55,18 +74,7 @@ export async function onRequestGet({ request, env, waitUntil }) {
     cities: citiesList,
     categories: cat.results,
     tags: tag.results,
-    products: prod.results.map((p) => {
-      const attrs = parse(p.attributes);
-      const productImages = imagesByProduct[p.id] || [];
-      return {
-        ...p,
-        attributes: attrs,
-        colors: attrs.colors || [],
-        images: productImages,
-        image_ids: productImages.map(img => img.id),
-        tag_ids: nums(p.tag_ids)
-      };
-    })
+    products: productsList
   });
 
   const res = new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${TTL}` } });

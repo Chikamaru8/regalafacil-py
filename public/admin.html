@@ -72,7 +72,7 @@
         <form id="bizForm" class="settings-card stack">
           <h3>Datos del negocio</h3>
           <label class="field"><span>Nombre del negocio</span><input type="text" id="bizName" required /></label>
-          <label class="field"><span>WhatsApp del administrador (recibe los pedidos sin link de vendedor)</span><input type="tel" id="bizPhone" required placeholder="0981 123 456" /></label>
+          <label class="field"><span>WhatsApp del administrador (recibe los pedidos de productos sin vendedor asignado)</span><input type="tel" id="bizPhone" required placeholder="0981 123 456" /></label>
           <button type="submit" class="btn btn-ghost btn-sm">Guardar datos</button>
           <p id="bizMsg" class="error-text" hidden></p>
         </form>
@@ -134,18 +134,24 @@
         <label class="field">
           <span>Estado</span>
           <select id="prodStatus">
-            <option value="active">Activo</option>
-            <option value="paused">Pausado</option>
+            <option value="active">Disponible</option>
+            <option value="paused">Agotado</option>
           </select>
         </label>
       </div>
 
-      <label class="field">
-        <span>Ciudad del producto / negocio</span>
-        <input type="text" id="prodCity" list="prodCityOptions" placeholder="Ej: Villa Elisa, Asunción, Luque..." />
-        <datalist id="prodCityOptions"></datalist>
-        <small class="muted">Permite que el comprador filtre productos por ciudad en el catálogo.</small>
-      </label>
+      <div class="grid-2">
+        <label class="field">
+          <span>Vendedor / Dueño del producto</span>
+          <select id="prodSeller"></select>
+        </label>
+        <label class="field">
+          <span>Ciudad del producto / negocio</span>
+          <input type="text" id="prodCity" list="prodCityOptions" placeholder="Ej: Villa Elisa, Asunción..." />
+          <datalist id="prodCityOptions"></datalist>
+        </label>
+      </div>
+      <small class="muted" style="margin-top:-6px;">Los pedidos de este producto irán directo al WhatsApp del vendedor elegido (si queda vacío, van al administrador).</small>
 
       <label class="field">
         <span>Descripción</span>
