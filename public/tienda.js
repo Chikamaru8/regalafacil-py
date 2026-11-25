@@ -66,17 +66,26 @@ function getColorObjects(p) {
 }
 
 // ---------- WhatsApp y registro del pedido ----------
-function buildWhatsAppUrl(product, price, ref) {
+function function buildWhatsAppUrl(product, price, ref) {
   const sellerName = appData.seller?.name ? ` (${appData.seller.name})` : "";
   const productUrl = window.location.origin + window.location.pathname + `?p=${product.id}`;
+  const colors = getColorObjects(product);
 
   let message = `¡Hola${sellerName}! Me interesa este producto de *${BRAND_NAME}*:\n\n`;
   message += `🔍 Ref: *#${ref}*\n`;
   message += `🛍️ *${product.name}*\n`;
   message += `💰 Precio: *${formatGs(price)}*\n`;
+
+  if (product.description && String(product.description).trim()) {
+    message += `📝 Descripción: ${String(product.description).trim()}\n`;
+  }
+
   if (selectedColor) {
     message += `🎨 Color/Variante: *${selectedColor}*\n`;
+  } else if (colors.length > 0) {
+    message += `🎨 Variantes disponibles: ${colors.map(c => c.name).join(", ")}\n`;
   }
+
   if (state.giftContext) {
     message += `🎁 Ocasión: *${state.giftContext.recipient}* (${state.giftContext.occasion})\n`;
   }
@@ -506,7 +515,7 @@ function showRegalitoBubble() {
 
   // Se oculta solo después de 8 segundos para no estorbar
   clearTimeout(bubbleTimer);
-  bubbleTimer = setTimeout(hideRegalitoBubble, 8000);
+  bubbleTimer = setTimeout(hideRegalitoBubble, 12000);
 }
 
 function hideRegalitoBubble() {
