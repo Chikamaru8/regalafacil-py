@@ -189,8 +189,7 @@ async function initCatalog() {
   try {
     const phoneNum = getPhone();
     if (phoneNum) {
-      const topTel = document.getElementById("topTel");
-      if (topTel) topTel.textContent = `+${phoneNum.slice(0,3)} ${phoneNum.slice(3,6)} ${phoneNum.slice(6)}`;
+
       const fabBtn = document.getElementById("fabBtn");
       if (fabBtn) fabBtn.href = `https://wa.me/${phoneNum}?text=${encodeURIComponent('¡Hola! Tengo una consulta sobre ' + BRAND_NAME)}`;
       const consultBtn = document.getElementById("consultStockBtn");
