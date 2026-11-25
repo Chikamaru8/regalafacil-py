@@ -7,6 +7,7 @@ let pendingRef = "";
 let currentActiveImageId = null; // Controla la foto activa mostrada en el modal
 
 const formatGs = amount => "Gs. " + Number(amount || 0).toLocaleString('es-PY');
+const IMG_VER = Date.now();
 const getPhone = () => String(appData.seller?.phone || appData.settings.business?.default_phone || "595994354894").replace(/\D/g, "");
 
 // ---------- Almacenamiento local seguro ----------
@@ -53,17 +54,6 @@ function generateRef() {
 }
 
 // ---------- Colores ----------
-// function getColorObjects(p) {
-//   const raw = p?.attributes?.colors;
-//   if (!Array.isArray(raw)) return [];
-//   return raw.map(c => {
-//     if (typeof c === 'object' && c !== null) {
-//       return { name: String(c.name || '').trim(), image_id: c.image_id || null };
-//     }
-//     return { name: String(c || '').trim(), image_id: null };
-//   }).filter(c => c.name);
-// }
-
 function getColorObjects(p) {
   const raw = p?.attributes?.colors;
   if (!Array.isArray(raw)) return [];
@@ -199,7 +189,7 @@ function renderProducts() {
   grid.innerHTML = list.map((p, index) => {
     const price = getEffectivePrice(p);
     const hasOffer = p.offer_price_gs != null && price < Number(p.price_gs);
-    const imgUrl = p.image_ids && p.image_ids.length ? `/api/image/${p.image_ids[0]}` : 'https://placehold.co/400x400/f1f5f9/64748b?text=Sin+Foto';
+    const imgUrl = p.image_ids && p.image_ids.length ? `/api/image/${p.image_ids[0]}?v=${IMG_VER}` : 'https://placehold.co/400x400/f1f5f9/64748b?text=Sin+Foto';
     const catObj = (appData.categories || []).find(c => c.id === p.category_id);
     const catStr = catObj ? catObj.name : 'General';
     const badgeText = p.attributes?.badge || (hasOffer ? 'Oferta' : 'Ideal regalo');
@@ -312,7 +302,7 @@ function openProductModal(id) {
   currentProduct = p;
   pendingRef = generateRef();
   const price = getEffectivePrice(p);
-  
+
   // Obtener la lista de imágenes (soporta tanto el formato nuevo como antiguo)
   const images = p.images || (p.image_ids ? p.image_ids.map(imgId => ({ id: imgId })) : []);
   currentActiveImageId = images.length ? images[0].id : null;
@@ -331,31 +321,29 @@ function openProductModal(id) {
   // Renderizar variantes de color
   const colors = getColorObjects(p);
   const colorContainer = document.getElementById("colorOptions");
-  
+
   if (colors.length > 0) {
     colorContainer.innerHTML = colors.map((col, idx) => `
       <button type="button" data-name="${esc(col.name)}" class="color-btn px-3 py-1.5 rounded-xl text-xs font-semibold border ${idx === 0 ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-700'} transition cursor-pointer">
         ${esc(col.name)}
       </button>
     `).join("");
-    
+
     colorContainer.querySelectorAll(".color-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const colorName = btn.dataset.name;
         selectColor(colorName, btn);
-        
+
         const matchedColorObj = colors.find(c => c.name === colorName);
         if (matchedColorObj && matchedColorObj.image_id) {
-          currentActiveImageId = matchedColorObj.image_id;
-          updateModalImageDisplay();
+          setActiveImage(matchedColorObj.image_id);
         }
       });
     });
     selectedColor = colors[0].name;
-    
+
     if (colors[0].image_id) {
-      currentActiveImageId = colors[0].image_id;
-      updateModalImageDisplay();
+      setActiveImage(colors[0].image_id);
     }
   } else {
     colorContainer.innerHTML = '<span class="text-xs text-slate-400">Modelo único</span>';
@@ -381,7 +369,7 @@ function openProductModal(id) {
 function updateModalImageDisplay() {
   const imgEl = document.getElementById("modalImg");
   if (currentActiveImageId) {
-    imgEl.src = `/api/image/${currentActiveImageId}`;
+    imgEl.src = `/api/image/${currentActiveImageId}?v=${IMG_VER}`;
   } else {
     imgEl.src = 'https://placehold.co/400x400/f1f5f9/64748b?text=Sin+Foto';
   }
@@ -400,7 +388,7 @@ function renderModalThumbnails(images) {
   thumbContainer.classList.remove("hidden");
   thumbContainer.innerHTML = images.map((img) => `
     <button type="button" onclick="setActiveImage(${img.id})" class="w-14 h-14 rounded-xl overflow-hidden border-2 shrink-0 ${currentActiveImageId === img.id ? 'border-brand-600 shadow-sm' : 'border-slate-200 opacity-70 hover:opacity-100'} transition cursor-pointer">
-      <img src="/api/image/${img.id}" class="w-full h-full object-cover" />
+      <img src="/api/image/${img.id}?v=${IMG_VER}" class="w-full h-full object-cover" />
     </button>
   `).join("");
 }
@@ -408,57 +396,16 @@ function renderModalThumbnails(images) {
 window.setActiveImage = function(imgId) {
   currentActiveImageId = imgId;
   updateModalImageDisplay();
-  
-  // Actualizar los bordes y opacidad de las miniaturas activas
+
   const thumbContainer = document.getElementById("modalThumbnails");
   if (thumbContainer) {
     thumbContainer.querySelectorAll("button").forEach(btn => {
       const isActive = btn.getAttribute("onclick").includes(`setActiveImage(${imgId})`);
-      btn.className = isActive 
-        ? "w-14 h-14 rounded-xl overflow-hidden border-2 border-brand-600 shadow-sm shrink-0 transition cursor-pointer" 
+      btn.className = isActive
+        ? "w-14 h-14 rounded-xl overflow-hidden border-2 border-brand-600 shadow-sm shrink-0 transition cursor-pointer"
         : "w-14 h-14 rounded-xl overflow-hidden border-2 border-slate-200 opacity-70 hover:opacity-100 shrink-0 transition cursor-pointer";
     });
   }
-};
-
-function updateModalImageDisplay() {
-  const imgEl = document.getElementById("modalImg");
-  if (currentActiveImageId) {
-    imgEl.src = `/api/image/${currentActiveImageId}`;
-  } else {
-    imgEl.src = 'https://placehold.co/400x400/f1f5f9/64748b?text=Sin+Foto';
-  }
-}
-
-function renderModalThumbnails(images) {
-  // Opcional: si quieres mostrar un contenedor de miniaturas debajo de la foto principal
-  // Buscamos o creamos un contenedor de miniaturas si existe en el modal
-  let thumbContainer = document.getElementById("modalThumbnails");
-  if (!thumbContainer) return;
-
-  if (images.length <= 1) {
-    thumbContainer.innerHTML = "";
-    thumbContainer.classList.add("hidden");
-    return;
-  }
-
-  thumbContainer.classList.remove("hidden");
-  thumbContainer.innerHTML = images.map((img) => `
-    <button type="button" onclick="setActiveImage(${img.id})" class="w-12 h-12 rounded-lg overflow-hidden border-2 ${currentActiveImageId === img.id ? 'border-brand-600' : 'border-transparent'} transition cursor-pointer">
-      <img src="/api/image/${img.id}" class="w-full h-full object-cover" />
-    </button>
-  `).join("");
-}
-
-window.setActiveImage = function(imgId) {
-  currentActiveImageId = imgId;
-  updateModalImageDisplay();
-  // Actualizar borde activo en miniaturas
-  document.querySelectorAll("#modalThumbnails button").forEach(btn => {
-    btn.className = btn.innerHTML.includes(`image/${currentActiveImageId}`) 
-      ? "w-12 h-12 rounded-lg overflow-hidden border-2 border-brand-600 transition cursor-pointer" 
-      : "w-12 h-12 rounded-lg overflow-hidden border-2 border-transparent transition cursor-pointer";
-  });
 };
 
 function selectColor(col, btnEl) {
