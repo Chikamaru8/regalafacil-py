@@ -572,8 +572,8 @@ function exportLeadsToExcel() {
   const a = document.createElement('a');
   const stamp = new Date().toISOString().slice(0, 10);
   a.href = url;
-  // a.download = `pedidos-regalafacil-${stamp}.csv`;
-   a.download = `pedidos-${stamp}.csv`;
+  a.download = `pedidos-regalafacil-${stamp}.csv`;
+   
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -682,7 +682,7 @@ function buildAiPrompt(city, phone, sellerName) {
     '- NO inventes precios ni datos que no estén claros. Si el precio no se lee, dejalo en 0 y poné "requiere_revision": true.',
     '- Detectá oferta ("tiene_oferta": true) SOLO si hay dos precios claros (actual y anterior/tachado).',
     '- Redactá la "descripcion" en máximo 2 frases cortas y vendedoras (máx. 180 caracteres) con esta fórmula:',
-    '  1) Identificación (Marca y Nombre exacto): transmite seguridad y prestigio inmediato.',
+    '  1) Identificación (Nombre exacto del producto, sin incluir el nombre de la tienda): transmite seguridad y prestigio inmediato.',
     '  2) El Diferenciador (Característica clave): qué lo hace mejor o ideal para regalar (ej: concentración Parfum, 100 ml, acero inox 24h, etc.).',
     '- Redactá "detalle_corto" como un gancho rápido de máximo 65 caracteres con el diferenciador principal.',
     `Usá esta ciudad para todos los productos: "${city}".`,
