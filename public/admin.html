@@ -6,6 +6,10 @@
   <title>Admin — RegaláFácil PY</title>
   <link rel="stylesheet" href="/admin.css" />
   <style>
+    .pass-wrap{position:relative;display:flex;align-items:center}
+    .pass-wrap input{width:100%;padding-right:42px}
+    .pass-toggle{position:absolute;right:8px;background:transparent;border:none;cursor:pointer;padding:4px 6px;color:#64748b;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center}
+    .pass-toggle:hover{color:#0f172a}
     .bottom-nav{grid-template-columns:repeat(3,1fr)}
     .settings-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px}
     .settings-card h3{margin:0 0 8px;font-size:1rem}
@@ -46,13 +50,16 @@
         </label>
         <label class="field">
           <span>Contraseña</span>
-          <input type="password" id="loginPassword" name="password" autocomplete="current-password" required />
+          <div class="pass-wrap">
+            <input type="password" id="loginPassword" name="password" autocomplete="current-password" required />
+            <button type="button" class="pass-toggle" data-toggle-pass="loginPassword" aria-label="Mostrar contraseña" title="Mostrar u ocultar contraseña">👁️</button>
+          </div>
         </label>
         <button type="submit" class="btn btn-primary" id="loginBtn">Entrar</button>
         <p id="loginError" class="error-text" hidden></p>
       </form>
 
-      <!-- 2. SOLICITAR CUENTA DE VENDEDOR -->
+      <!-- 2. CREAR CUENTA DE VENDEDOR (ACCESO INMEDIATO) -->
       <form id="registerForm" class="stack" hidden>
         <label class="field">
           <span>Tu nombre o nombre de tu tienda *</span>
@@ -72,9 +79,12 @@
         </label>
         <label class="field">
           <span>Contraseña (mín. 6 caracteres) *</span>
-          <input type="password" id="regPassword" minlength="6" required />
+          <div class="pass-wrap">
+            <input type="password" id="regPassword" minlength="6" autocomplete="new-password" required />
+            <button type="button" class="pass-toggle" data-toggle-pass="regPassword" aria-label="Mostrar contraseña" title="Mostrar u ocultar contraseña">👁️</button>
+          </div>
         </label>
-        <button type="submit" class="btn btn-primary" id="registerBtn">Solicitar acceso</button>
+        <button type="submit" class="btn btn-primary" id="registerBtn">Crear cuenta y entrar</button>
         <p id="registerMsg" class="ok-text" hidden></p>
         <p id="registerError" class="error-text" hidden></p>
       </form>
