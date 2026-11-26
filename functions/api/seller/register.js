@@ -3,7 +3,11 @@ import {
   createSessionToken,
   hashPassword
 } from '../admin/_auth.js';
-import { sendEmail } from '../admin/_email.js';
+import {
+  buildAdminNewSellerEmail,
+  buildSellerWelcomeEmail,
+  sendEmail
+} from '../admin/_email.js';
 
 function slugify(text) {
   return String(text || '')
@@ -22,72 +26,43 @@ function normalizePhone(phone) {
   return d;
 }
 
-function escapeHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+async function logOnboardingEvent(db, payload) {
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS onboarding_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seller_id INTEGER,
+        name TEXT NOT NULL,
+        city TEXT DEFAULT '',
+        phone TEXT DEFAULT '',
+        email TEXT DEFAULT '',
+        slug TEXT DEFAULT '',
+        method TEXT DEFAULT 'Correo y contraseña',
+        welcome_sent INTEGER DEFAULT 0,
+        admin_notified INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL
+      )
+    `).run();
 
-function buildWelcomeEmailHtml({ name, origin, slug }) {
-  const safeName = escapeHtml(name);
-  const storeUrl = `${origin}/?v=${encodeURIComponent(slug)}`;
-  const panelUrl = `${origin}/admin.html`;
-
-  return `
-  <div style="margin:0;padding:24px 12px;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
-      
-      <!-- PORTADA -->
-      <div style="background:linear-gradient(135deg,#0f172a 0%,#e11d48 100%);padding:32px 24px;text-align:center;color:#ffffff;">
-        <div style="display:inline-block;background:rgba(255,255,255,0.16);padding:6px 14px;border-radius:999px;font-size:12px;font-weight:bold;letter-spacing:0.5px;margin-bottom:12px;">
-          🎁 REGALÁFÁCIL PY
-        </div>
-        <h1 style="margin:0;font-size:24px;line-height:1.25;">¡Bienvenido/a, ${safeName}!</h1>
-        <p style="margin:10px 0 0;font-size:14px;color:#f1f5f9;">
-          Tu tienda ya está activa y lista para recibir consultas directo a tu WhatsApp.
-        </p>
-      </div>
-
-      <!-- CUERPO -->
-      <div style="padding:24px;">
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#334155;">
-          Ya podés empezar a cargar tus productos y compartir tu catálogo personalizado con tus clientes.
-        </p>
-
-        <!-- ENLACE DIRECTO -->
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;padding:14px;margin-bottom:20px;">
-          <div style="font-size:11px;font-weight:bold;text-transform:uppercase;color:#64748b;margin-bottom:6px;">
-            Tu enlace directo de tienda
-          </div>
-          <a href="${storeUrl}" style="font-size:14px;font-weight:bold;color:#e11d48;word-break:break-all;text-decoration:none;">
-            ${storeUrl}
-          </a>
-        </div>
-
-        <!-- 3 PASOS RÁPIDOS -->
-        <div style="margin-bottom:24px;">
-          <p style="margin:0 0 10px;font-size:13px;font-weight:bold;color:#0f172a;">Empezá en 3 pasos simples:</p>
-          <p style="margin:0 0 8px;font-size:13px;color:#334155;"><strong>1.</strong> Cargá tus productos con foto y precio desde tu panel.</p>
-          <p style="margin:0 0 8px;font-size:13px;color:#334155;"><strong>2.</strong> Compartí tu enlace directo en tus Estados de WhatsApp e Instagram.</p>
-          <p style="margin:0;font-size:13px;color:#334155;"><strong>3.</strong> Recibí los pedidos directo en tu WhatsApp y llevalos ordenados en tu panel.</p>
-        </div>
-
-        <!-- BOTÓN -->
-        <div style="text-align:center;">
-          <a href="${panelUrl}" style="display:inline-block;background:#e11d48;color:#ffffff;font-weight:bold;font-size:14px;padding:12px 24px;border-radius:10px;text-decoration:none;">
-            Ir a mi Panel de Vendedor
-          </a>
-        </div>
-      </div>
-
-      <!-- PIE -->
-      <div style="background:#f1f5f9;padding:14px 24px;text-align:center;font-size:11px;color:#64748b;">
-        RegaláFácil PY · Plataforma de regalos y novedades en Paraguay
-      </div>
-    </div>
-  </div>`;
+    await db.prepare(`
+      INSERT INTO onboarding_log (
+        seller_id, name, city, phone, email, slug, method, welcome_sent, admin_notified, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      payload.sellerId ?? null,
+      payload.name,
+      payload.city || '',
+      payload.phone || '',
+      payload.email || '',
+      payload.slug || '',
+      payload.method || 'Correo y contraseña',
+      payload.welcomeSent ? 1 : 0,
+      payload.adminNotified ? 1 : 0,
+      payload.createdAt
+    ).run();
+  } catch (err) {
+    console.error('Error guardando onboarding_log:', err);
+  }
 }
 
 export async function onRequestPost({ request, env }) {
@@ -161,35 +136,54 @@ export async function onRequestPost({ request, env }) {
   const origin = new URL(request.url).origin;
 
   // 1) Correo de bienvenida con portada al nuevo vendedor
+  const welcomeTemplate = buildSellerWelcomeEmail({
+    name,
+    origin,
+    slug: candidateSlug,
+    methodLabel: 'Correo y contraseña'
+  });
   const welcomeMail = await sendEmail(env, {
     to: email,
-    subject: '🎁 ¡Bienvenido/a a RegaláFácil PY! Tu tienda ya está activa',
-    html: buildWelcomeEmailHtml({ name, origin, slug: candidateSlug })
+    subject: welcomeTemplate.subject,
+    html: welcomeTemplate.html
   });
 
-  // 2) Aviso informativo al administrador (sin bloquear al usuario)
+  // 2) Notificación al administrador (sin bloquear al usuario)
+  let adminNotified = false;
   const adminEmail = env.ADMIN_EMAIL || env.ALERT_EMAIL || '';
   if (adminEmail) {
-    await sendEmail(env, {
-      to: adminEmail,
-      subject: `Nuevo vendedor activo en RegaláFácil PY: ${name}`,
-      html: `
-        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a;">
-          <h3>Nuevo vendedor registrado (acceso automático)</h3>
-          <ul>
-            <li><strong>Nombre / Tienda:</strong> ${escapeHtml(name)}</li>
-            ${city ? `<li><strong>Ciudad:</strong> ${escapeHtml(city)}</li>` : ''}
-            <li><strong>Correo:</strong> ${escapeHtml(email)}</li>
-            <li><strong>WhatsApp:</strong> ${escapeHtml(phone)}</li>
-            <li><strong>Enlace:</strong> <a href="${origin}/?v=${encodeURIComponent(candidateSlug)}">${origin}/?v=${encodeURIComponent(candidateSlug)}</a></li>
-          </ul>
-          <p>Podés gestionarlo o pausarlo cuando quieras desde <a href="${origin}/admin.html">tu panel</a>.</p>
-        </div>
-      `
+    const adminTemplate = buildAdminNewSellerEmail({
+      name,
+      city,
+      phone,
+      email,
+      slug: candidateSlug,
+      origin,
+      methodLabel: 'Correo y contraseña'
     });
+    const adminMail = await sendEmail(env, {
+      to: adminEmail,
+      subject: adminTemplate.subject,
+      html: adminTemplate.html
+    });
+    adminNotified = Boolean(adminMail?.sent);
   }
 
-  // 3) Auto-login inmediato
+  // 3) Guardar registro en el historial de onboarding
+  await logOnboardingEvent(env.DB, {
+    sellerId,
+    name,
+    city,
+    phone,
+    email,
+    slug: candidateSlug,
+    method: 'Correo y contraseña',
+    welcomeSent: Boolean(welcomeMail?.sent),
+    adminNotified,
+    createdAt: now
+  });
+
+  // 4) Auto-login inmediato
   const headers = { 'Content-Type': 'application/json' };
   let autoLoggedIn = false;
   try {

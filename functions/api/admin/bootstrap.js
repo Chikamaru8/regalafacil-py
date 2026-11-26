@@ -74,6 +74,21 @@ export async function onRequestGet({ request, env, data }) {
     leadsQuery.all()
   ]);
 
+  let onboardingLogs = [];
+  if (!isSeller) {
+    try {
+      const { results: logs } = await env.DB.prepare(`
+        SELECT id, seller_id, name, city, phone, email, slug, method, welcome_sent, admin_notified, created_at
+        FROM onboarding_log
+        ORDER BY id DESC
+        LIMIT 50
+      `).all();
+      onboardingLogs = logs || [];
+    } catch {
+      onboardingLogs = [];
+    }
+  }
+
   const settings = {};
   for (const row of settingsRows) {
     try { settings[row.key] = JSON.parse(row.value); } catch { settings[row.key] = row.value; }
@@ -110,6 +125,7 @@ export async function onRequestGet({ request, env, data }) {
     categories,
     tags,
     sellers,
+    onboardingLogs,
     products: products.map(p => {
       let attrs = {};
       try {
