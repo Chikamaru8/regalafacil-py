@@ -954,6 +954,19 @@ function setupAiAssistantControls() {
 }
 
 /* ---------- Formulario de producto ---------- */
+const AGE_RANGE_LABELS = {
+  'niño/a': 'Niño/a (0–11 años)',
+  'nino/a': 'Niño/a (0–11 años)',
+  'joven': 'Joven (12–25 años)',
+  'adulto': 'Adulto (26–59 años)',
+  'adulto mayor': 'Adulto mayor (60+ años)'
+};
+
+function formatTagLabel(rawLabel) {
+  const clean = String(rawLabel || '').trim();
+  return AGE_RANGE_LABELS[clean.toLowerCase()] || clean;
+}
+
 function populateFormOptions() {
   const cats = state.data?.categories || [];
   $('#prodCategory').innerHTML = `<option value="">Sin categoría</option>` +
@@ -961,9 +974,9 @@ function populateFormOptions() {
 
   const tags = state.data?.tags || [];
   $('#prodTags').innerHTML = tags.map((t) => `
-    <label class="chip-check">
+    <label class="chip-check" style="white-space:nowrap;">
       <input type="checkbox" value="${t.id}" />
-      <span>${escapeHtml(t.label)}</span>
+      <span>${escapeHtml(formatTagLabel(t.label))}</span>
     </label>
   `).join('');
 
