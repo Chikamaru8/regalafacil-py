@@ -17,22 +17,78 @@
     .leads-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
     .leads-controls input,.leads-controls select{padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff}
     .leads-controls input{flex:1;min-width:190px}
+    .auth-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px;background:#f1f5f9;padding:4px;border-radius:10px}
+    .auth-tab{border:none;background:transparent;padding:8px 6px;border-radius:8px;font-size:12px;font-weight:700;color:#475569;cursor:pointer}
+    .auth-tab.active{background:#fff;color:#0f172a;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .ok-text{color:#15803d;font-size:13px;font-weight:600;margin:6px 0 0}
+    .pending-card{border:1px solid #f59e0b;background:#fffbeb;border-radius:12px;padding:12px;margin-bottom:10px}
   </style>
 </head>
 <body>
-  <!-- Pantalla de acceso -->
+  <!-- Pantalla de acceso, registro y recuperación -->
   <section id="loginView" class="login-wrap">
     <div class="login-card">
       <div class="brand-badge">RegaláFácil PY</div>
-      <h1>Panel de Administración</h1>
-      <p class="muted">Ingresá tu contraseña para gestionar productos, ofertas y pedidos.</p>
+      <h1>Portal de Gestión</h1>
+      <p class="muted">Administradores y vendedores aprobados.</p>
+
+      <div class="auth-tabs" role="tablist" aria-label="Opciones de acceso">
+        <button type="button" role="tab" aria-selected="true" class="auth-tab active" data-auth-mode="login">Ingresar</button>
+        <button type="button" role="tab" aria-selected="false" class="auth-tab" data-auth-mode="register">Registrarse</button>
+        <button type="button" role="tab" aria-selected="false" class="auth-tab" data-auth-mode="forgot">Recuperar</button>
+      </div>
+
+      <!-- 1. INICIAR SESIÓN -->
       <form id="loginForm" class="stack">
+        <label class="field">
+          <span>Correo electrónico (vendedores; opcional para Admin)</span>
+          <input type="email" id="loginEmail" name="email" autocomplete="email" placeholder="vendedor@correo.com" />
+        </label>
         <label class="field">
           <span>Contraseña</span>
           <input type="password" id="loginPassword" name="password" autocomplete="current-password" required />
         </label>
         <button type="submit" class="btn btn-primary" id="loginBtn">Entrar</button>
         <p id="loginError" class="error-text" hidden></p>
+      </form>
+
+      <!-- 2. SOLICITAR CUENTA DE VENDEDOR -->
+      <form id="registerForm" class="stack" hidden>
+        <label class="field">
+          <span>Tu nombre o nombre de tu tienda *</span>
+          <input type="text" id="regName" required placeholder="Ej: Novedades del Sur" />
+        </label>
+        <label class="field">
+          <span>Ciudad / Zona</span>
+          <input type="text" id="regCity" placeholder="Ej: Villa Elisa, Asunción" />
+        </label>
+        <label class="field">
+          <span>WhatsApp de ventas *</span>
+          <input type="tel" id="regPhone" required placeholder="0981 123 456" />
+        </label>
+        <label class="field">
+          <span>Correo electrónico *</span>
+          <input type="email" id="regEmail" required placeholder="tu-correo@ejemplo.com" />
+        </label>
+        <label class="field">
+          <span>Contraseña (mín. 6 caracteres) *</span>
+          <input type="password" id="regPassword" minlength="6" required />
+        </label>
+        <button type="submit" class="btn btn-primary" id="registerBtn">Solicitar acceso</button>
+        <p id="registerMsg" class="ok-text" hidden></p>
+        <p id="registerError" class="error-text" hidden></p>
+      </form>
+
+      <!-- 3. RECUPERAR CONTRASEÑA -->
+      <form id="forgotForm" class="stack" hidden>
+        <p class="muted" style="margin:0;">Te enviaremos una contraseña temporal a tu correo registrado.</p>
+        <label class="field">
+          <span>Correo electrónico registrado *</span>
+          <input type="email" id="forgotEmail" required placeholder="tu-correo@ejemplo.com" />
+        </label>
+        <button type="submit" class="btn btn-primary" id="forgotBtn">Enviar recuperación</button>
+        <p id="forgotMsg" class="ok-text" hidden></p>
+        <p id="forgotError" class="error-text" hidden></p>
       </form>
     </div>
   </section>
@@ -42,7 +98,7 @@
     <header class="topbar">
       <div>
         <strong>RegaláFácil PY</strong>
-        <span class="badge-env">Admin</span>
+        <span id="roleBadge" class="badge-env">Admin</span>
       </div>
       <div class="topbar-actions">
         <a href="/" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Ver catálogo</a>
@@ -57,7 +113,6 @@
           <button type="button" id="newProductBtn" class="btn btn-primary btn-sm">+ Nuevo producto</button>
         </div>
 
-        <!-- Buscador y botones de ordenamiento -->
         <div class="admin-controls" style="margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
           <input type="text" id="searchInput" placeholder="🔍 Buscar producto por nombre..." style="flex: 1; min-width: 220px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff;" />
           <div style="display: flex; gap: 6px;">
@@ -75,10 +130,8 @@
           <button type="button" id="exportLeadsBtn" class="btn btn-ghost btn-sm" style="border:1px solid #cbd5e1;background:#fff;">📊 Exportar Excel</button>
         </div>
 
-        <!-- Métricas en vivo -->
         <div id="leadsMetrics" class="metrics-grid"></div>
 
-        <!-- Buscador y filtros de pedidos -->
         <div class="leads-controls">
           <input type="text" id="leadSearchInput" placeholder="🔍 Buscar por Ref, producto, cliente..." />
           <select id="leadSellerFilter">
@@ -104,9 +157,16 @@
 
       <section id="tab-sellers" class="tab-panel">
         <div class="panel-head">
-          <h2>Vendedores</h2>
+          <h2>Vendedores y Aprobaciones</h2>
           <button type="button" id="newSellerBtn" class="btn btn-primary btn-sm">+ Nuevo vendedor</button>
         </div>
+
+        <!-- Aprobador de solicitudes pendientes (solo visible para Admin) -->
+        <div id="pendingApprovalsCard" class="settings-card" hidden>
+          <h3>⏳ Solicitudes pendientes de aprobación</h3>
+          <div id="pendingApprovalsList"></div>
+        </div>
+
         <form id="bizForm" class="settings-card stack">
           <h3>Datos del negocio</h3>
           <label class="field"><span>Nombre del negocio</span><input type="text" id="bizName" required /></label>
@@ -118,7 +178,6 @@
       </section>
     </main>
 
-    <!-- Navegación inferior móvil -->
     <nav class="bottom-nav" aria-label="Secciones del panel">
       <button type="button" class="nav-item active" data-tab="products">
         <span>Productos</span>
@@ -142,7 +201,6 @@
 
       <input type="hidden" id="prodId" />
 
-      <!-- ASISTENTE DE CARGA CON IA (SIN API PAGA) -->
       <div class="settings-card" style="background:#f8fafc;border:1px solid #cbd5e1;padding:12px;margin-bottom:4px;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
           <strong style="font-size:13px;">🤖 Carga asistida por IA (sin costo de API)</strong>
@@ -212,7 +270,7 @@
         </label>
       </div>
 
-      <div class="grid-2">
+      <div class="grid-2" id="prodOwnerRow">
         <label class="field">
           <span>Vendedor / Dueño del producto</span>
           <select id="prodSeller"></select>
@@ -223,7 +281,7 @@
           <datalist id="prodCityOptions"></datalist>
         </label>
       </div>
-      <small class="muted" style="margin-top:-6px;">Los pedidos de este producto irán directo al WhatsApp del vendedor elegido (si queda vacío, van al administrador).</small>
+      <small id="prodOwnerHelp" class="muted" style="margin-top:-6px;">Los pedidos de este producto irán directo al WhatsApp del vendedor elegido (si queda vacío, van al administrador).</small>
 
       <label class="field">
         <span>Descripción</span>
@@ -241,14 +299,12 @@
         <div id="prodTags" class="chips-wrap"></div>
       </div>
 
-      <!-- FOTO PRINCIPAL INDEPENDIENTE -->
       <div class="field">
         <span>Foto principal del producto (se comprime automáticamente)</span>
         <input type="file" id="prodImageFile" accept="image/*" />
         <div id="prodImagePreview" class="img-preview" style="margin-top: 8px;"></div>
       </div>
 
-      <!-- GALERÍA DE FOTOS ADICIONALES (EXCLUYE LA PRINCIPAL) -->
       <div class="field" style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
           <span style="font-weight:600; font-size:14px;">Galería de fotos adicionales (hasta 7 fotos)</span>
@@ -261,7 +317,6 @@
         <div id="productImagesGallery"></div>
       </div>
 
-      <!-- VARIANTES DE COLOR -->
       <div class="field" id="variantsContainerSection">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <span>Variantes de color (Opcional)</span>

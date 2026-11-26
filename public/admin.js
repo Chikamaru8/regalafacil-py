@@ -1,6 +1,5 @@
 const state = { data: null, selectedFile: null, editingProduct: null };
 
-// Marca de tiempo dinámica para evitar problemas de caché en navegadores
 const getCacheStamp = () => Date.now();
 
 const $ = (sel) => document.querySelector(sel);
@@ -53,26 +52,208 @@ async function api(path, opts = {}) {
   return json;
 }
 
+function setAuthMode(mode) {
+  document.querySelectorAll('.auth-tab').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.authMode === mode);
+  });
+  $('#loginForm').hidden = mode !== 'login';
+  $('#registerForm').hidden = mode !== 'register';
+  $('#forgotForm').hidden = mode !== 'forgot';
+  $('#loginError').hidden = true;
+  $('#registerError').hidden = true;
+  $('#registerMsg').hidden = true;
+  $('#forgotError').hidden = true;
+  $('#forgotMsg').hidden = true;
+}
+
+document.querySelectorAll('.auth-tab').forEach((btn) => {
+  btn.addEventListener('click', () => setAuthMode(btn.dataset.authMode));
+});
+
 function showLogin(msg = '') {
+  state.data = null;
   $('#adminApp').hidden = true;
   $('#loginView').hidden = false;
+  setAuthMode('login');
   $('#loginError').textContent = msg;
   $('#loginError').hidden = !msg;
 }
 
+function isSellerSession() {
+  return state.data?.session?.role === 'seller';
+}
+
+function renderSellerShareBanner() {
+  const host = $('#sellerShareBanner');
+  if (!isSellerSession()) {
+    if (host) host.remove();
+    return;
+  }
+
+  const slug = state.data?.session?.slug || '';
+  const shareUrl = slug
+    ? `${window.location.origin}/?v=${encodeURIComponent(slug)}`
+    : `${window.location.origin}/`;
+
+  let box = $('#sellerShareBanner');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'sellerShareBanner';
+    box.className = 'settings-card';
+    box.style.marginBottom = '14px';
+    const productsTab = $('#tab-products');
+    if (productsTab) productsTab.prepend(box);
+  }
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+      <div>
+        <strong style="font-size:13px;">🔗 Tu enlace directo de ventas</strong>
+        <div class="muted" style="font-size:12px;word-break:break-all;">${escapeHtml(shareUrl)}</div>
+      </div>
+      <button type="button" id="copySellerLinkBtn" class="btn btn-ghost btn-sm" style="background:#fff;border:1px solid #cbd5e1;">📋 Copiar enlace</button>
+    </div>
+  `;
+
+  const copyBtn = $('#copySellerLinkBtn');
+  if (copyBtn && !copyBtn.dataset.listener) {
+    copyBtn.dataset.listener = 'true';
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        copyBtn.textContent = '✅ Copiado';
+        setTimeout(() => { copyBtn.textContent = '📋 Copiar enlace'; }, 2000);
+      } catch {
+        alert(shareUrl);
+      }
+    });
+  }
+}
+
+function applyRoleUi() {
+  const isSeller = isSellerSession();
+  const badge = $('#roleBadge');
+  if (badge) {
+    badge.textContent = isSeller ? `Vendedor: ${state.data?.session?.name || ''}` : 'Admin';
+  }
+
+  const sellerNav = document.querySelector('.nav-item[data-tab="sellers"]');
+  const sellerTab = $('#tab-sellers');
+  if (sellerNav) sellerNav.hidden = isSeller;
+  if (sellerTab && isSeller) {
+    sellerTab.classList.remove('active');
+    if (sellerNav.classList.contains('active')) {
+      sellerNav.classList.remove('active');
+      document.querySelector('.nav-item[data-tab="products"]')?.classList.add('active');
+      $('#tab-products')?.classList.add('active');
+    }
+  }
+
+  const sellerFilter = $('#leadSellerFilter');
+  if (sellerFilter) sellerFilter.hidden = isSeller;
+
+  const prodSellerSelect = $('#prodSeller');
+  if (prodSellerSelect) prodSellerSelect.disabled = isSeller;
+
+  const ownerHelp = $('#prodOwnerHelp');
+  if (ownerHelp) {
+    ownerHelp.textContent = isSeller
+      ? 'Tus productos se publican automáticamente con tu tienda y tu WhatsApp.'
+      : 'Los pedidos de este producto irán directo al WhatsApp del vendedor elegido (si queda vacío, van al administrador).';
+  }
+
+  renderSellerShareBanner();
+}
+
 async function showApp() {
   await refreshBootstrap();
+  applyRoleUi();
   $('#loginView').hidden = true;
   $('#adminApp').hidden = false;
 }
 
 async function refreshBootstrap() {
   state.data = await api('/api/admin/bootstrap');
+  applyRoleUi();
   setupAdminSearchAndSort(state.data?.products || []);
   populateFormOptions();
   setupLeadsControls();
   renderLeads();
+  renderPendingApprovals();
   setupPriceFormatter();
+}
+
+/* ---------- Aprobador de vendedores pendientes (Admin) ---------- */
+function isPendingSeller(s) {
+  if (!s) return false;
+  if (s.approval_status === 'pending') return true;
+  if (s.approval_status === 'approved' || s.approval_status === 'rejected') return false;
+  return Number(s.active) === 0 && Boolean(s.email);
+}
+
+function renderPendingApprovals() {
+  const card = $('#pendingApprovalsCard');
+  const list = $('#pendingApprovalsList');
+  if (!card || !list) return;
+
+  if (isSellerSession()) {
+    card.hidden = true;
+    return;
+  }
+
+  const pending = (state.data?.sellers || []).filter(isPendingSeller);
+  if (!pending.length) {
+    card.hidden = true;
+    list.innerHTML = '';
+    return;
+  }
+
+  card.hidden = false;
+  list.innerHTML = pending.map((s) => `
+    <div class="pending-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div>
+          <strong>${escapeHtml(s.name)}</strong>
+          ${s.email ? `<span class="muted"> · ${escapeHtml(s.email)}</span>` : ''}
+          ${s.phone ? `<div class="muted" style="font-size:12px;">📱 ${escapeHtml(s.phone)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button type="button" class="btn btn-primary btn-sm" data-approve-seller="${s.id}">Aprobar</button>
+          <button type="button" class="btn btn-danger btn-sm" data-reject-seller="${s.id}">Rechazar</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('[data-approve-seller]').forEach((btn) => {
+    btn.addEventListener('click', () => handleSellerApproval(Number(btn.dataset.approveSeller), 'approved', 1));
+  });
+
+  list.querySelectorAll('[data-reject-seller]').forEach((btn) => {
+    btn.addEventListener('click', () => handleSellerApproval(Number(btn.dataset.rejectSeller), 'rejected', 0));
+  });
+}
+
+async function handleSellerApproval(sellerId, approvalStatus, active) {
+  const seller = (state.data?.sellers || []).find((s) => Number(s.id) === Number(sellerId));
+  if (!seller) return;
+  try {
+    await api('/api/admin/sellers', {
+      method: 'PUT',
+      body: JSON.stringify({
+        id: seller.id,
+        name: seller.name,
+        city: seller.city || '',
+        phone: seller.phone,
+        email: seller.email || '',
+        approval_status: approvalStatus,
+        active
+      })
+    });
+    await refreshBootstrap();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 /* ---------- Productos, buscador y orden ---------- */
@@ -82,6 +263,13 @@ let adminSort = { key: null, asc: true };
 
 function visibleProducts() {
   let list = [...adminProducts];
+  if (isSellerSession()) {
+    const myId = Number(state.data?.session?.sellerId);
+    list = list.filter((p) => {
+      const pSeller = Number(p.seller_id || p.attributes?.seller_id || 0);
+      return pSeller === myId;
+    });
+  }
   if (adminTerm) list = list.filter((p) => String(p.name || '').toLowerCase().includes(adminTerm));
   if (adminSort.key === 'name') {
     list.sort((a, b) => (adminSort.asc ? 1 : -1) * String(a.name).localeCompare(String(b.name), 'es'));
@@ -107,7 +295,7 @@ function renderProducts(products = []) {
     const isActive = p.status === 'active';
     const cityLabel = p.attributes?.city ? String(p.attributes.city).trim() : '';
     const shortDetail = p.attributes?.short_detail ? String(p.attributes.short_detail).trim() : '';
-    const sellerId = p.attributes?.seller_id ? Number(p.attributes.seller_id) : null;
+    const sellerId = p.seller_id || p.attributes?.seller_id ? Number(p.seller_id || p.attributes.seller_id) : null;
     const sellerObj = sellerId ? sellers.find((s) => Number(s.id) === sellerId) : null;
     return `
       <article class="card">
@@ -273,12 +461,22 @@ function getFilteredLeads() {
   const sevenDaysAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
 
   return all.filter((l) => {
+    if (isSellerSession()) {
+      const myId = Number(state.data?.session?.sellerId);
+      const myName = String(state.data?.session?.name || '').trim().toLowerCase();
+      const leadSellerId = Number(l.seller_id || 0);
+      const leadSellerName = String(l.seller_name || '').trim().toLowerCase();
+      if (leadSellerId !== myId && (!myName || leadSellerName !== myName)) return false;
+    }
+
     if (leadFilters.status && l.status !== leadFilters.status) return false;
 
-    if (leadFilters.seller === '__none__') {
-      if (String(l.seller_name || '').trim() !== '') return false;
-    } else if (leadFilters.seller) {
-      if (String(l.seller_name || '').trim() !== leadFilters.seller) return false;
+    if (!isSellerSession()) {
+      if (leadFilters.seller === '__none__') {
+        if (String(l.seller_name || '').trim() !== '') return false;
+      } else if (leadFilters.seller) {
+        if (String(l.seller_name || '').trim() !== leadFilters.seller) return false;
+      }
     }
 
     const ts = Number(l.created_at) || 0;
@@ -657,7 +855,9 @@ function setupAiAssistantControls() {
         const items = parseAiJsonText($('#aiJsonInput')?.value || '');
         if (!items.length) throw new Error('No hay productos en el JSON.');
 
-        const sellerIdVal = $('#prodSeller')?.value ? Number($('#prodSeller').value) : null;
+        const sellerIdVal = isSellerSession()
+          ? Number(state.data?.session?.sellerId)
+          : ($('#prodSeller')?.value ? Number($('#prodSeller').value) : null);
         const fallbackCity = String($('#prodCity')?.value || '').trim();
         let createdCount = 0;
 
@@ -767,6 +967,13 @@ function populateFormOptions() {
     sellerSelect.innerHTML = `<option value="">Administrador (por defecto)</option>` +
       sellers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}${s.city ? ' — ' + escapeHtml(s.city) : ''}</option>`).join('');
 
+    if (isSellerSession()) {
+      sellerSelect.value = String(state.data.session.sellerId);
+      sellerSelect.disabled = true;
+    } else {
+      sellerSelect.disabled = false;
+    }
+
     if (!sellerSelect.dataset.listener) {
       sellerSelect.dataset.listener = 'true';
       sellerSelect.addEventListener('change', () => {
@@ -796,11 +1003,6 @@ function populateFormOptions() {
   setupAiAssistantControls();
 }
 
-/* ============================================================
-   ESTADO DE IMÁGENES ESTRICTAMENTE SEPARADO
-- mainPhotoId: ID único de la foto principal (independiente)
-- galleryImagesList: Array de IDs exclusivo para la galería
-   ============================================================ */
 let productVariants = [];
 let mainPhotoId = null;
 let galleryImagesList = [];
@@ -829,7 +1031,6 @@ function renderImagesSection() {
   renderVariantsForm(productVariants);
 }
 
-/* --- Foto principal (TOTALMENTE AISLADA) --- */
 function renderMainPreview() {
   const box = $('#prodImagePreview');
   if (!box) return;
@@ -887,7 +1088,6 @@ async function removeMainPhoto() {
   renderImagesSection();
 }
 
-/* --- Galería adicional independiente (Foto #1, #2...) --- */
 function renderGallery() {
   const container = $('#productImagesGallery');
   if (!container) return;
@@ -991,7 +1191,6 @@ if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
   });
 }
 
-/* --- Variantes de Color --- */
 function renderVariantsForm(variants = productVariants) {
   productVariants = variants;
   const container = $('#productVariantsList');
@@ -1049,7 +1248,6 @@ if (addVariantBtn && !addVariantBtn.dataset.listener) {
   });
 }
 
-/* --- Modal de producto --- */
 function openProductModal(prod = null) {
   state.editingProduct = prod;
   state.selectedFile = null;
@@ -1085,7 +1283,11 @@ function openProductModal(prod = null) {
     $('#prodCategory').value = prod.category_id || '';
     $('#prodStatus').value = prod.status || 'active';
     const sellerSelect = $('#prodSeller');
-    if (sellerSelect) sellerSelect.value = prod.attributes?.seller_id ? String(prod.attributes.seller_id) : '';
+    if (sellerSelect) {
+      sellerSelect.value = isSellerSession()
+        ? String(state.data.session.sellerId)
+        : (prod.seller_id || prod.attributes?.seller_id ? String(prod.seller_id || prod.attributes.seller_id) : '');
+    }
     const cityInput = $('#prodCity');
     if (cityInput) cityInput.value = prod.attributes?.city || '';
     $('#prodDesc').value = prod.description || '';
@@ -1103,7 +1305,9 @@ function openProductModal(prod = null) {
     $('#prodId').value = '';
     $('#prodStatus').value = 'active';
     const sellerSelect = $('#prodSeller');
-    if (sellerSelect) sellerSelect.value = '';
+    if (sellerSelect) {
+      sellerSelect.value = isSellerSession() ? String(state.data.session.sellerId) : '';
+    }
     const cityInput = $('#prodCity');
     if (cityInput) cityInput.value = '';
     const shortDetailInput = $('#prodShortDetail');
@@ -1143,7 +1347,7 @@ async function compressImageFile(file) {
   return best;
 }
 
-/* ---------- Eventos ---------- */
+/* ---------- Eventos de Login, Registro y Recuperación ---------- */
 $('#loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('#loginError').hidden = true;
@@ -1151,7 +1355,10 @@ $('#loginForm').addEventListener('submit', async (e) => {
   try {
     await api('/api/admin/login', {
       method: 'POST',
-      body: JSON.stringify({ password: $('#loginPassword').value })
+      body: JSON.stringify({
+        email: $('#loginEmail')?.value.trim() || '',
+        password: $('#loginPassword').value
+      })
     });
     $('#loginPassword').value = '';
     await showApp();
@@ -1163,9 +1370,56 @@ $('#loginForm').addEventListener('submit', async (e) => {
   }
 });
 
+$('#registerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#registerError').hidden = true;
+  $('#registerMsg').hidden = true;
+  $('#registerBtn').disabled = true;
+  try {
+    const res = await api('/api/seller/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: $('#regName').value.trim(),
+        phone: $('#regPhone').value.trim(),
+        email: $('#regEmail').value.trim(),
+        password: $('#regPassword').value
+      })
+    });
+    $('#registerForm').reset();
+    $('#registerMsg').textContent = res.message || 'Solicitud enviada. Queda pendiente de aprobación.';
+    $('#registerMsg').hidden = false;
+  } catch (err) {
+    $('#registerError').textContent = err.message;
+    $('#registerError').hidden = false;
+  } finally {
+    $('#registerBtn').disabled = false;
+  }
+});
+
+$('#forgotForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#forgotError').hidden = true;
+  $('#forgotMsg').hidden = true;
+  $('#forgotBtn').disabled = true;
+  try {
+    const res = await api('/api/seller/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: $('#forgotEmail').value.trim()
+      })
+    });
+    $('#forgotMsg').textContent = res.message || 'Revisá tu correo para ver las instrucciones.';
+    $('#forgotMsg').hidden = false;
+  } catch (err) {
+    $('#forgotError').textContent = err.message;
+    $('#forgotError').hidden = false;
+  } finally {
+    $('#forgotBtn').disabled = false;
+  }
+});
+
 $('#logoutBtn').addEventListener('click', async () => {
   try { await api('/api/admin/logout', { method: 'POST' }); } catch {}
-  state.data = null;
   showLogin();
 });
 
@@ -1191,7 +1445,6 @@ $('#prodImageFile').addEventListener('change', async (e) => {
   renderMainPreview();
 });
 
-/* ---------- SUBMIT ATÓMICO BLINDADO ---------- */
 $('#productForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('#productFormError').hidden = true;
@@ -1227,7 +1480,10 @@ $('#productForm').addEventListener('submit', async (e) => {
 
     const cityVal = String($('#prodCity')?.value || '').trim().slice(0, 80);
     const shortDetailVal = String($('#prodShortDetail')?.value || '').trim().slice(0, 90);
-    const sellerIdVal = $('#prodSeller')?.value ? Number($('#prodSeller').value) : null;
+    const sellerIdVal = isSellerSession()
+      ? Number(state.data?.session?.sellerId)
+      : ($('#prodSeller')?.value ? Number($('#prodSeller').value) : null);
+
     const baseAttrs = state.editingProduct?.attributes && typeof state.editingProduct.attributes === 'object'
       ? { ...state.editingProduct.attributes }
       : {};
@@ -1338,12 +1594,12 @@ $('#deleteProductBtn').addEventListener('click', async () => {
 document.querySelectorAll('.nav-item').forEach((btn) => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
+    if (tab === 'sellers' && isSellerSession()) return;
     document.querySelectorAll('.nav-item').forEach((b) => b.classList.toggle('active', b === btn));
     document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.id === `tab-${tab}`));
   });
 });
 
-// Arranque
 (async function init() {
   try {
     await showApp();
