@@ -572,7 +572,8 @@ function exportLeadsToExcel() {
   const a = document.createElement('a');
   const stamp = new Date().toISOString().slice(0, 10);
   a.href = url;
-  a.download = `pedidos-regalafacil-${stamp}.csv`;
+  // a.download = `pedidos-regalafacil-${stamp}.csv`;
+   a.download = `pedidos-${stamp}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

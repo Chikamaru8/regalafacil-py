@@ -6,6 +6,26 @@
   <title>Admin — RegaláFácil PY</title>
   <link rel="stylesheet" href="/admin.css" />
   <style>
+    /* Modal de producto a pantalla completa y por bloques */
+    #productModal.sheet{width:100vw;max-width:1180px;height:94vh;max-height:94vh;margin:auto;padding:0;border-radius:16px;overflow:hidden}
+    #productModal .modal-shell{display:flex;flex-direction:column;height:100%;max-height:94vh;background:#f8fafc}
+    #productModal .sheet-head{padding:14px 20px;background:#fff;border-bottom:1px solid #e2e8f0;margin:0;flex-shrink:0}
+    #productModal .modal-body{flex:1;overflow-y:auto;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+    #productModal .modal-col{display:flex;flex-direction:column;gap:14px}
+    #productModal .form-block{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+    #productModal .block-title{margin:0;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#334155;border-bottom:1px solid #f1f5f9;padding-bottom:6px}
+    #productModal .ai-block{background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);border:1px solid #cbd5e1}
+    #productModal .ai-steps{margin:0;padding-left:18px;font-size:12.5px;color:#334155;line-height:1.5}
+    #productModal .ai-steps li{margin-bottom:3px}
+    #productModal .ai-actions-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    #productModal .btn-ia{background:#fff;border:1px solid #cbd5e1;color:#0f172a;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+    #productModal .btn-ia:hover{background:#f1f5f9}
+    #productModal .sheet-actions{padding:12px 20px;background:#fff;border-top:1px solid #e2e8f0;margin:0;flex-shrink:0}
+    @media (max-width:860px){
+      #productModal.sheet{width:100vw;height:100dvh;max-height:100dvh;border-radius:0}
+      #productModal .modal-shell{max-height:100dvh}
+      #productModal .modal-body{grid-template-columns:1fr;padding:12px}
+    }
     .pass-wrap{position:relative;display:flex;align-items:center}
     .pass-wrap input{width:100%;padding-right:42px}
     .pass-toggle{position:absolute;right:8px;background:transparent;border:none;cursor:pointer;padding:4px 6px;color:#64748b;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center}
@@ -201,9 +221,9 @@
     </nav>
   </div>
 
-  <!-- Hoja para crear o editar producto -->
+  <!-- Hoja a pantalla completa para crear o editar producto -->
   <dialog id="productModal" class="sheet">
-    <form id="productForm" method="dialog" class="stack">
+    <form id="productForm" method="dialog" class="modal-shell">
       <div class="sheet-head">
         <h3 id="productModalTitle">Nuevo producto</h3>
         <button type="button" id="closeModalBtn" class="icon-btn" aria-label="Cerrar">✕</button>
@@ -211,154 +231,167 @@
 
       <input type="hidden" id="prodId" />
 
-      <div class="settings-card" style="background:#f8fafc;border:1px solid #cbd5e1;padding:12px;margin-bottom:4px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-          <strong style="font-size:13px;">🤖 Carga asistida por IA (sin costo de API)</strong>
-          <button type="button" id="genAiPromptBtn" class="btn btn-ghost btn-sm" style="background:#fff;border:1px solid #cbd5e1;">Generar prompt</button>
-        </div>
+      <div class="modal-body">
+        <!-- COLUMNA IZQUIERDA: IA + DATOS BÁSICOS -->
+        <div class="modal-col">
+          <!-- BLOQUE 1: CARGA ASISTIDA POR IA -->
+          <div class="form-block ai-block">
+            <h4 class="block-title">🤖 Carga rápida con IA (Gratis)</h4>
+            <ol class="ai-steps">
+              <li>Tocá <strong>Copiar prompt</strong> (se copia listo con tus datos).</li>
+              <li>Abrí <strong>Gemini</strong> o <strong>ChatGPT</strong> con los botones de abajo.</li>
+              <li>Pegá el texto y subí la foto (o varias fotos) de tus productos.</li>
+              <li>Copiá el código que te devuelve la IA y pegalo en el cuadro de abajo.</li>
+            </ol>
 
-        <div id="aiPromptBox" hidden style="margin-bottom:10px;">
-          <label class="field">
-            <span>Copiá este prompt y pegalo junto con las fotos en tu IA</span>
-            <textarea id="aiPromptOutput" rows="7" readonly style="font-size:12px;background:#fff;"></textarea>
-          </label>
-          <button type="button" id="copyAiPromptBtn" class="btn btn-ghost btn-sm" style="margin-top:6px;">📋 Copiar prompt</button>
-        </div>
+            <div class="ai-actions-row">
+              <button type="button" id="genAiPromptBtn" class="btn btn-primary btn-sm">📋 Copiar prompt</button>
+              <a href="https://gemini.google.com/app" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-ia">✨ Abrir Gemini</a>
+              <a href="https://chatgpt.com/" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-ia">💬 Abrir ChatGPT</a>
+            </div>
 
-        <label class="field">
-          <span>Pegá aquí el JSON que devolvió la IA</span>
-          <textarea id="aiJsonInput" rows="3" placeholder='{"productos":[{"nombre":"...","precio":150000,...}]}' style="font-size:12px;background:#fff;"></textarea>
-        </label>
+            <div id="aiPromptBox" hidden>
+              <label class="field">
+                <span>Prompt generado (copiado al portapapeles)</span>
+                <textarea id="aiPromptOutput" rows="4" readonly style="font-size:11px;background:#fff;"></textarea>
+              </label>
+            </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button type="button" id="applyAiJsonBtn" class="btn btn-ghost btn-sm" style="background:#fff;border:1px solid #cbd5e1;">✨ Autocompletar</button>
-            <button type="button" id="createAllAiJsonBtn" class="btn btn-primary btn-sm">🚀 Crear todos los productos</button>
+            <label class="field">
+              <span>Pegá aquí el código JSON que devolvió la IA</span>
+              <textarea id="aiJsonInput" rows="3" placeholder='{"productos":[{"nombre":"...","precio":150000,...}]}' style="font-size:12px;background:#fff;"></textarea>
+            </label>
+
+            <div class="ai-actions-row" style="justify-content:space-between;">
+              <div class="ai-actions-row">
+                <button type="button" id="applyAiJsonBtn" class="btn btn-ghost btn-sm btn-ia">✨ Autocompletar</button>
+                <button type="button" id="createAllAiJsonBtn" class="btn btn-primary btn-sm">🚀 Crear todos</button>
+              </div>
+              <div id="aiBatchNav" hidden style="display:flex;align-items:center;gap:6px;font-size:12px;">
+                <button type="button" id="aiPrevBtn" class="btn btn-ghost btn-sm">◀</button>
+                <span id="aiBatchCounter">1 / 1</span>
+                <button type="button" id="aiNextBtn" class="btn btn-ghost btn-sm">▶</button>
+              </div>
+            </div>
+            <p id="aiHelperMsg" class="muted" style="margin:0;font-size:12px;"></p>
           </div>
-          <div id="aiBatchNav" hidden style="display:flex;align-items:center;gap:6px;font-size:12px;">
-            <button type="button" id="aiPrevBtn" class="btn btn-ghost btn-sm">◀</button>
-            <span id="aiBatchCounter">1 / 1</span>
-            <button type="button" id="aiNextBtn" class="btn btn-ghost btn-sm">▶</button>
+
+          <!-- BLOQUE 2: DATOS PRINCIPALES Y PRECIOS -->
+          <div class="form-block">
+            <h4 class="block-title">🏷️ Datos del producto y precio</h4>
+
+            <label class="field">
+              <span>Nombre del regalo *</span>
+              <input type="text" id="prodName" required placeholder="Ej: Perfume Azzaro Chrome Parfum 100ml" />
+            </label>
+
+            <div class="grid-2">
+              <label class="field">
+                <span>Precio normal (Gs.) *</span>
+                <input type="number" id="prodPrice" min="1" step="1" required placeholder="150000" />
+              </label>
+              <label class="field">
+                <span>Precio oferta (Gs.)</span>
+                <input type="number" id="prodOfferPrice" min="0" step="1" placeholder="Opcional" />
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Oferta válida hasta</span>
+              <input type="datetime-local" id="prodOfferEnds" />
+              <small class="muted">Solo si cargás precio de oferta. Al vencer vuelve al precio normal solo.</small>
+            </label>
+
+            <div class="grid-2">
+              <label class="field">
+                <span>Categoría</span>
+                <select id="prodCategory"></select>
+              </label>
+              <label class="field">
+                <span>Estado</span>
+                <select id="prodStatus">
+                  <option value="active">Disponible</option>
+                  <option value="paused">Agotado</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="grid-2" id="prodOwnerRow">
+              <label class="field">
+                <span>Vendedor / Tienda</span>
+                <select id="prodSeller"></select>
+              </label>
+              <label class="field">
+                <span>Ciudad / Zona</span>
+                <input type="text" id="prodCity" list="prodCityOptions" placeholder="Ej: Villa Elisa, Asunción..." />
+                <datalist id="prodCityOptions"></datalist>
+              </label>
+            </div>
+            <small id="prodOwnerHelp" class="muted" style="margin-top:-4px;">Los pedidos irán directo al WhatsApp del vendedor elegido.</small>
           </div>
         </div>
-        <p id="aiHelperMsg" class="muted" style="margin:6px 0 0;font-size:12px;"></p>
-      </div>
 
-      <label class="field">
-        <span>Nombre del regalo *</span>
-        <input type="text" id="prodName" required placeholder="Ej: Box Matero Premium" />
-      </label>
+        <!-- COLUMNA DERECHA: DESCRIPCIÓN + FOTOS + VARIANTES -->
+        <div class="modal-col">
+          <!-- BLOQUE 3: DESCRIPCIÓN Y ETIQUETAS -->
+          <div class="form-block">
+            <h4 class="block-title">✍️ Descripción y etiquetas</h4>
 
-      <div class="grid-2">
-        <label class="field">
-          <span>Precio normal (Gs.) *</span>
-          <input type="number" id="prodPrice" min="1" step="1" required placeholder="150000" />
-        </label>
-        <label class="field">
-          <span>Precio oferta (Gs.)</span>
-          <input type="number" id="prodOfferPrice" min="0" step="1" placeholder="Opcional" />
-        </label>
-      </div>
+            <label class="field">
+              <span>Detalle corto (gancho rápido)</span>
+              <input type="text" id="prodShortDetail" maxlength="90" placeholder="Ej: Concentración Parfum · 100 ml original" />
+              <small class="muted">Frase corta que resalta el diferenciador clave.</small>
+            </label>
 
-      <label class="field">
-        <span>Oferta válida hasta</span>
-        <input type="datetime-local" id="prodOfferEnds" />
-        <small class="muted">Obligatoria si cargás un precio de oferta. Al llegar esa fecha el precio vuelve al normal solo.</small>
-      </label>
+            <label class="field">
+              <span>Descripción comercial</span>
+              <textarea id="prodDesc" rows="3" placeholder="Marca, nombre y por qué es ideal para regalar..."></textarea>
+            </label>
 
-      <div class="grid-2">
-        <label class="field">
-          <span>Categoría</span>
-          <select id="prodCategory"></select>
-        </label>
-        <label class="field">
-          <span>Estado</span>
-          <select id="prodStatus">
-            <option value="active">Disponible</option>
-            <option value="paused">Agotado</option>
-          </select>
-        </label>
-      </div>
+            <div class="field">
+              <span>Etiquetas (para quién / ocasión / edad)</span>
+              <div id="prodTags" class="chips-wrap"></div>
+            </div>
+          </div>
 
-      <div class="grid-2" id="prodOwnerRow">
-        <label class="field">
-          <span>Vendedor / Dueño del producto</span>
-          <select id="prodSeller"></select>
-        </label>
-        <label class="field">
-          <span>Ciudad del producto / negocio</span>
-          <input type="text" id="prodCity" list="prodCityOptions" placeholder="Ej: Villa Elisa, Asunción..." />
-          <datalist id="prodCityOptions"></datalist>
-        </label>
-      </div>
-      <small id="prodOwnerHelp" class="muted" style="margin-top:-6px;">Los pedidos de este producto irán directo al WhatsApp del vendedor elegido (si queda vacío, van al administrador).</small>
+          <!-- BLOQUE 4: FOTOS Y VARIANTES -->
+          <div class="form-block">
+            <h4 class="block-title">📸 Fotos y colores</h4>
 
-      <label class="field">
-        <span>Descripción</span>
-        <textarea id="prodDesc" rows="3" placeholder="Detalles, qué incluye, presentación..."></textarea>
-      </label>
+            <div class="field">
+              <span>Foto principal (se comprime sola)</span>
+              <input type="file" id="prodImageFile" accept="image/*" />
+              <div id="prodImagePreview" class="img-preview" style="margin-top: 8px;"></div>
+            </div>
 
-      <label class="field">
-        <span>Detalle corto (gancho rápido)</span>
-        <input type="text" id="prodShortDetail" maxlength="90" placeholder="Ej: Acero inox 24h · Incluye mate y bombilla" />
-        <small class="muted">Frase corta según el tipo de producto para darle mayor visibilidad.</small>
-      </label>
+            <div class="field" style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="font-weight:600; font-size:13px;">Galería adicional (hasta 7 fotos)</span>
+                <label class="btn btn-ghost btn-sm" style="cursor:pointer; margin:0; background:#fff; border:1px solid #cbd5e1;">
+                  + Agregar fotos
+                  <input type="file" id="addMoreImagesBtn" accept="image/*" multiple style="display:none;" />
+                </label>
+              </div>
+              <div id="productImagesGallery"></div>
+            </div>
 
-      <div class="field">
-        <span>Etiquetas (para quién / ocasión / edad)</span>
-        <div id="prodTags" class="chips-wrap"></div>
-      </div>
-
-      <div class="field">
-        <span>Foto principal del producto (se comprime automáticamente)</span>
-        <input type="file" id="prodImageFile" accept="image/*" />
-        <div id="prodImagePreview" class="img-preview" style="margin-top: 8px;"></div>
-      </div>
-
-      <div class="field" style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-weight:600; font-size:14px;">Galería de fotos adicionales (hasta 7 fotos)</span>
-          <label class="btn btn-ghost btn-sm" style="cursor:pointer; margin:0;">
-            + Agregar fotos
-            <input type="file" id="addMoreImagesBtn" accept="image/*" multiple style="display:none;" />
-          </label>
+            <div class="field" id="variantsContainerSection">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span>Variantes de color (Opcional)</span>
+                <button type="button" id="addVariantBtn" class="btn btn-ghost btn-sm">+ Agregar color</button>
+              </div>
+              <div id="productVariantsList" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+          </div>
         </div>
-        <small class="muted" style="display:block; margin-bottom:8px;">Estas fotos acompañan a la principal en la vista del producto.</small>
-        <div id="productImagesGallery"></div>
       </div>
 
-      <div class="field" id="variantsContainerSection">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <span>Variantes de color (Opcional)</span>
-          <button type="button" id="addVariantBtn" class="btn btn-ghost btn-sm">+ Agregar color</button>
-        </div>
-        <small class="muted" style="display:block; margin-bottom:8px;">Ideal para termos o productos con múltiples colores.</small>
-        <div id="productVariantsList" style="display:flex; flex-direction:column; gap:8px;"></div>
-      </div>
-
-      <p id="productFormError" class="error-text" hidden></p>
+      <p id="productFormError" class="error-text" hidden style="padding:0 20px;margin:6px 0 0;"></p>
 
       <div class="sheet-actions">
         <button type="button" id="deleteProductBtn" class="btn btn-danger" hidden>Eliminar</button>
-        <button type="submit" class="btn btn-primary" id="saveProductBtn">Guardar</button>
+        <button type="submit" class="btn btn-primary" id="saveProductBtn">Guardar producto</button>
       </div>
-    </form>
-  </dialog>
-
-  <dialog id="sellerModal" class="sheet">
-    <form id="sellerForm" method="dialog" class="stack">
-      <div class="sheet-head">
-        <h3 id="sellerTitle">Nuevo vendedor</h3>
-        <button type="button" id="closeSellerBtn" class="icon-btn" aria-label="Cerrar">✕</button>
-      </div>
-      <input type="hidden" id="sId" />
-      <label class="field"><span>Nombre *</span><input type="text" id="sName" required /></label>
-      <label class="field"><span>Ciudad</span><input type="text" id="sCity" placeholder="Ej: Asunción" /></label>
-      <label class="field"><span>WhatsApp con el que trabaja *</span><input type="tel" id="sPhone" required placeholder="0981 123 456" /></label>
-      <label class="field"><span>Estado</span><select id="sActive"><option value="1">Activo</option><option value="0">Inactivo</option></select></label>
-      <p class="muted">Su link no cambia nunca, aunque cambies el número.</p>
-      <p id="sellerError" class="error-text" hidden></p>
-      <div class="sheet-actions"><button type="submit" class="btn btn-primary" id="saveSellerBtn">Guardar</button></div>
     </form>
   </dialog>
 
