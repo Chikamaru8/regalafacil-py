@@ -54,7 +54,9 @@ async function api(path, opts = {}) {
 
 function setAuthMode(mode) {
   document.querySelectorAll('.auth-tab').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.authMode === mode);
+    const isActive = btn.dataset.authMode === mode;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
   $('#loginForm').hidden = mode !== 'login';
   $('#registerForm').hidden = mode !== 'register';
@@ -68,6 +70,17 @@ function setAuthMode(mode) {
 
 document.querySelectorAll('.auth-tab').forEach((btn) => {
   btn.addEventListener('click', () => setAuthMode(btn.dataset.authMode));
+});
+
+document.querySelectorAll('.pass-toggle').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.togglePass);
+    if (!input) return;
+    const isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+    btn.textContent = isHidden ? '🙈' : '👁️';
+    btn.setAttribute('aria-label', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña');
+  });
 });
 
 function showLogin(msg = '') {
@@ -1380,13 +1393,18 @@ $('#registerForm').addEventListener('submit', async (e) => {
       method: 'POST',
       body: JSON.stringify({
         name: $('#regName').value.trim(),
+        city: $('#regCity')?.value.trim() || '',
         phone: $('#regPhone').value.trim(),
         email: $('#regEmail').value.trim(),
         password: $('#regPassword').value
       })
     });
     $('#registerForm').reset();
-    $('#registerMsg').textContent = res.message || 'Solicitud enviada. Queda pendiente de aprobación.';
+    if (res.autoLoggedIn) {
+      await showApp();
+      return;
+    }
+    $('#registerMsg').textContent = res.message || '¡Cuenta creada! Ya podés iniciar sesión.';
     $('#registerMsg').hidden = false;
   } catch (err) {
     $('#registerError').textContent = err.message;
