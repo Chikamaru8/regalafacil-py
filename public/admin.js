@@ -675,23 +675,25 @@ function resetAiAssistantUi() {
 function buildAiPrompt(city, phone, sellerName) {
   const categoriesList = (state.data?.categories || []).map((c) => c.name).join(', ') || 'General';
   return [
-    'Analizá cada fotografía adjunta de forma 100% independiente para cargar productos en la tienda RegaláFácil PY (Paraguay).',
-    'NO mezcles datos entre fotos ni inventes precios, capacidades, medidas o características que no estén visibles o claras en la imagen.',
-    'Si un precio o dato no se lee con claridad, dejalo en 0 y poné "requiere_revision": true.',
-    'Detectá oferta ("tiene_oferta": true) SOLO si hay dos precios claros (precio promocional/actual y precio anterior/tachado).',
-    'Identificá qué tipo de producto es y redactá un "detalle_corto" breve (máximo 75 caracteres, directo y sin relleno) con el dato clave visible o propio del tipo de producto para darle mayor visibilidad.',
-    `Usá exactamente esta ciudad para todos los productos: "${city}".`,
-    `Usá exactamente este teléfono de contacto para todos los productos: "${phone}"${sellerName ? ` (Vendedor: ${sellerName})` : ''}.`,
-    `Categorías disponibles de referencia (si encaja alguna, usá su nombre): ${categoriesList}.`,
+    'Actuá como redactor comercial experto para la tienda RegaláFácil PY (Paraguay). Analizá cada foto de forma independiente.',
+    'REGLAS ESTRICTAS:',
+    '- NO describas lo obvio de la imagen (NO digas "frasco azul", "caja original azul", "en la foto se ve...", ni pongas "[Foto #1]").',
+    '- NO inventes precios ni datos que no estén claros. Si el precio no se lee, dejalo en 0 y poné "requiere_revision": true.',
+    '- Detectá oferta ("tiene_oferta": true) SOLO si hay dos precios claros (actual y anterior/tachado).',
+    '- Redactá la "descripcion" en máximo 2 frases cortas y vendedoras (máx. 180 caracteres) con esta fórmula:',
+    '  1) Identificación (Marca y Nombre exacto): transmite seguridad y prestigio inmediato.',
+    '  2) El Diferenciador (Característica clave): qué lo hace mejor o ideal para regalar (ej: concentración Parfum, 100 ml, acero inox 24h, etc.).',
+    '- Redactá "detalle_corto" como un gancho rápido de máximo 65 caracteres con el diferenciador principal.',
+    `Usá esta ciudad para todos los productos: "${city}".`,
+    `Usá este teléfono de contacto: "${phone}"${sellerName ? ` (Tienda: ${sellerName})` : ''}.`,
+    `Categorías disponibles (usá el nombre exacto si encaja): ${categoriesList}.`,
     'Respondé ÚNICAMENTE con un JSON válido (sin texto antes ni después) con esta estructura:',
     JSON.stringify({
       productos: [
         {
-          indice_imagen: 1,
-          nombre: 'Nombre del producto',
-          tipo_producto: 'Ej: Termo, Aromatizante, Hidrolavadora, Box',
-          detalle_corto: 'Frase corta de alto impacto (máx. 75 caracteres)',
-          descripcion: 'Descripción clara basada en lo visible en la foto',
+          nombre: 'Marca y nombre comercial del producto',
+          detalle_corto: 'Diferenciador clave corto (máx. 65 caracteres)',
+          descripcion: 'Descripción comercial corta (identificación + diferenciador clave, sin relleno).',
           precio: 220000,
           tiene_oferta: false,
           precio_anterior: null,
@@ -749,8 +751,8 @@ function applyAiItemToForm(item) {
   }
 
   if (item.descripcion) {
-    const idxTag = item.indice_imagen ? `[Foto #${item.indice_imagen}] ` : '';
-    $('#prodDesc').value = `${idxTag}${String(item.descripcion).trim()}`.trim().slice(0, 1000);
+    const cleanDesc = String(item.descripcion).replace(/^\[Foto\s*#\d+\]\s*/i, '').trim();
+    $('#prodDesc').value = cleanDesc.slice(0, 1000);
   }
 
   const shortDetailInput = $('#prodShortDetail');
@@ -768,8 +770,8 @@ function applyAiItemToForm(item) {
   const helper = $('#aiHelperMsg');
   if (helper) {
     helper.textContent = item.requiere_revision
-      ? '⚠️ Este producto quedó marcado para revisión: verificá precio, oferta o detalle antes de guardar.'
-      : '✅ Formulario autocompletado desde el JSON. Revisá y tocá Guardar.';
+      ? '⚠️ Revisá el precio o detalle antes de guardar.'
+      : '✅ Datos cargados desde la IA. Subí la foto y tocá Guardar.';
   }
 }
 
@@ -790,7 +792,7 @@ function setupAiAssistantControls() {
   const genBtn = $('#genAiPromptBtn');
   if (genBtn && !genBtn.dataset.listener) {
     genBtn.dataset.listener = 'true';
-    genBtn.addEventListener('click', () => {
+    genBtn.addEventListener('click', async () => {
       const sellerSelect = $('#prodSeller');
       const selectedSeller = sellerSelect?.value
         ? (state.data?.sellers || []).find((s) => String(s.id) === String(sellerSelect.value))
@@ -798,11 +800,11 @@ function setupAiAssistantControls() {
 
       let city = String($('#prodCity')?.value || selectedSeller?.city || '').trim();
       if (!city) {
-        const askedCity = prompt('¿De qué ciudad son los productos que vas a cargar? (Ej: Villa Elisa, Asunción)');
+        const askedCity = prompt('¿De qué ciudad son los productos? (Ej: Villa Elisa, Asunción)');
         if (askedCity === null) return;
         city = askedCity.trim();
         if (!city) {
-          alert('Necesitás ingresar una ciudad para generar el prompt.');
+          alert('Necesitás ingresar una ciudad para armar el prompt.');
           return;
         }
         if ($('#prodCity')) $('#prodCity').value = city;
@@ -811,35 +813,26 @@ function setupAiAssistantControls() {
       const defaultPhone = selectedSeller?.phone || state.data?.settings?.business?.default_phone || '';
       let phone = String(defaultPhone || '').trim();
       if (!phone) {
-        const askedPhone = prompt('¿Cuál es el número de teléfono del vendedor para estos productos? (Ej: 0981 123 456)');
+        const askedPhone = prompt('¿Cuál es el WhatsApp del vendedor? (Ej: 0981 123 456)');
         if (askedPhone === null) return;
         phone = askedPhone.trim();
         if (!phone) {
-          alert('Necesitás ingresar un número de teléfono para generar el prompt.');
+          alert('Necesitás ingresar un teléfono para armar el prompt.');
           return;
         }
       }
 
       const promptText = buildAiPrompt(city, phone, selectedSeller?.name || '');
-      $('#aiPromptOutput').value = promptText;
-      $('#aiPromptBox').hidden = false;
-      $('#aiHelperMsg').textContent = 'Prompt generado con ciudad y teléfono. Copialo y adjuntá las fotos en tu IA.';
-    });
-  }
+      if ($('#aiPromptOutput')) $('#aiPromptOutput').value = promptText;
 
-  const copyBtn = $('#copyAiPromptBtn');
-  if (copyBtn && !copyBtn.dataset.listener) {
-    copyBtn.dataset.listener = 'true';
-    copyBtn.addEventListener('click', async () => {
-      const txt = $('#aiPromptOutput')?.value || '';
-      if (!txt) return;
       try {
-        await navigator.clipboard.writeText(txt);
-        $('#aiHelperMsg').textContent = '📋 Prompt copiado al portapapeles.';
+        await navigator.clipboard.writeText(promptText);
+        $('#aiHelperMsg').textContent = '✅ ¡Prompt copiado! Ahora tocá "Abrir Gemini" o "Abrir ChatGPT", pegalo y subí tus fotos.';
       } catch {
-        $('#aiPromptOutput').select();
+        if ($('#aiPromptBox')) $('#aiPromptBox').hidden = false;
+        $('#aiPromptOutput')?.select();
         document.execCommand('copy');
-        $('#aiHelperMsg').textContent = '📋 Prompt seleccionado/copiado.';
+        $('#aiHelperMsg').textContent = '✅ Prompt listo y seleccionado. Pegalo en Gemini o ChatGPT junto con tus fotos.';
       }
     });
   }
@@ -888,8 +881,7 @@ function setupAiAssistantControls() {
 
           const cityVal = String(item?.ciudad || fallbackCity || '').trim().slice(0, 80);
           const shortDetailVal = String(item?.detalle_corto || item?.detalleCorto || '').trim().slice(0, 90);
-          const idxNote = item?.indice_imagen ? `[Foto #${item.indice_imagen}] ` : '';
-          const descVal = `${idxNote}${String(item?.descripcion || '').trim()}`.trim().slice(0, 1000);
+          const descVal = String(item?.descripcion || '').replace(/^\[Foto\s*#\d+\]\s*/i, '').trim().slice(0, 1000);
 
           let categoryId = $('#prodCategory')?.value ? Number($('#prodCategory').value) : null;
           if (item?.categoria) {
