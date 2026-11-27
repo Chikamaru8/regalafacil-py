@@ -1,20 +1,41 @@
 import { getSession } from './_auth.js';
 
+async function ensureSellerPlanColumns(db) {
+  const alters = [
+    "ALTER TABLE seller ADD COLUMN plan_type TEXT DEFAULT 'trial'",
+    'ALTER TABLE seller ADD COLUMN plan_ends_at INTEGER',
+    'ALTER TABLE seller ADD COLUMN created_at INTEGER',
+    'ALTER TABLE seller ADD COLUMN last_login_at INTEGER'
+  ];
+  for (const sql of alters) {
+    try { await db.prepare(sql).run(); } catch {}
+  }
+}
+
 export async function onRequestGet({ request, env, data }) {
   const session = data?.session || (await getSession(request, env));
   if (!session) {
     return Response.json({ error: 'No autorizado' }, { status: 401 });
   }
 
+  await ensureSellerPlanColumns(env.DB);
+
   const isSeller = session.role === 'seller' && Boolean(session.sellerId);
   const sellerId = isSeller ? Number(session.sellerId) : null;
 
+  if (isSeller) {
+    try {
+      await env.DB.prepare('UPDATE seller SET last_login_at = ? WHERE id = ?')
+        .bind(Math.floor(Date.now() / 1000), sellerId).run();
+    } catch {}
+  }
+
   const sellersQuery = isSeller
     ? env.DB.prepare(
-        'SELECT id, slug, name, city, phone, email, approval_status, active FROM seller WHERE id = ? LIMIT 1'
+        "SELECT id, slug, name, city, phone, email, approval_status, active, COALESCE(plan_type, 'trial') AS plan_type, plan_ends_at, created_at, last_login_at FROM seller WHERE id = ? LIMIT 1"
       ).bind(sellerId)
     : env.DB.prepare(
-        'SELECT id, slug, name, city, phone, email, approval_status, active FROM seller ORDER BY CASE WHEN approval_status = "pending" THEN 0 ELSE 1 END, active DESC, name COLLATE NOCASE, id'
+        "SELECT id, slug, name, city, phone, email, approval_status, active, COALESCE(plan_type, 'trial') AS plan_type, plan_ends_at, created_at, last_login_at FROM seller ORDER BY CASE WHEN approval_status = 'pending' THEN 0 ELSE 1 END, active DESC, name COLLATE NOCASE, id"
       );
 
   const productsQuery = isSeller
@@ -115,8 +136,15 @@ export async function onRequestGet({ request, env, data }) {
     }
   }
 
+  const me = isSeller ? sellers[0] : null;
   const sessionOut = isSeller
-    ? { ...session, slug: sellers[0]?.slug || '' }
+    ? {
+        ...session,
+        slug: me?.slug || '',
+        plan_type: me?.plan_type || 'trial',
+        plan_ends_at: me?.plan_ends_at || null,
+        created_at: me?.created_at || null
+      }
     : session;
 
   return Response.json({

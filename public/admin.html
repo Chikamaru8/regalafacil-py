@@ -232,6 +232,10 @@
 
         <!-- 2. CREAR CUENTA DE VENDEDOR (ACCESO INMEDIATO) -->
         <form id="registerForm" class="stack" hidden>
+          <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:14px;padding:10px 12px;font-size:12.5px;color:#881337;line-height:1.45;">
+            🎁 <strong>60 días gratis</strong> para cargar productos sin límite. Después, solo <strong>Gs. 30.000/mes</strong> sin comisiones por venta.
+          </div>
+
           <label class="field">
             <span>Tu nombre o nombre de tu tienda *</span>
             <input type="text" id="regName" required placeholder="Ej: Novedades del Sur" />
@@ -373,7 +377,24 @@
           <button type="submit" class="btn btn-ghost btn-sm">Guardar datos</button>
           <p id="bizMsg" class="error-text" hidden></p>
         </form>
+
+        <div id="sellersMetrics" class="metrics-grid"></div>
+
+        <div class="leads-controls">
+          <input type="text" id="sellerSearchInput" placeholder="🔍 Buscar vendedor por nombre, ciudad, teléfono o correo..." />
+          <select id="sellerPlanFilter">
+            <option value="">Plan / Estado: Todos</option>
+            <option value="trial">En prueba gratis</option>
+            <option value="paid">Suscripción paga</option>
+            <option value="vip">VIP sin costo</option>
+            <option value="expiring">Por vencer (≤ 7 días)</option>
+            <option value="expired">Vencidos</option>
+            <option value="inactive">Suspendidos / Inactivos</option>
+          </select>
+        </div>
+
         <div id="sellersList" class="cards-list"></div>
+
         <div id="onboardingHistoryCard" class="settings-card" style="margin-top:16px;" hidden>
           <h3>📋 Historial de onboarding de vendedores</h3>
           <div id="onboardingHistoryList"></div>
@@ -565,6 +586,130 @@
         <button type="button" id="deleteProductBtn" class="btn btn-danger" hidden>Eliminar</button>
         <button type="submit" class="btn btn-primary" id="saveProductBtn">Guardar producto</button>
       </div>
+    </form>
+  </dialog>
+
+  <!-- Modal para crear, editar, dar VIP, sumar días o eliminar vendedor -->
+  <dialog id="sellerModal" class="sheet">
+    <form id="sellerForm" method="dialog" class="stack">
+      <div class="sheet-head">
+        <h3 id="sellerTitle">Nuevo vendedor</h3>
+        <button type="button" id="closeSellerBtn" class="icon-btn" aria-label="Cerrar">✕</button>
+      </div>
+
+      <input type="hidden" id="sId" />
+
+      <label class="field">
+        <span>Nombre o tienda *</span>
+        <input type="text" id="sName" required placeholder="Ej: Novedades del Sur" />
+      </label>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Ciudad / Zona</span>
+          <input type="text" id="sCity" placeholder="Ej: Villa Elisa" />
+        </label>
+        <label class="field">
+          <span>WhatsApp *</span>
+          <input type="tel" id="sPhone" required placeholder="0981 123 456" />
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Correo electrónico</span>
+        <input type="email" id="sEmail" placeholder="vendedor@correo.com" />
+      </label>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Acceso a la plataforma</span>
+          <select id="sActive">
+            <option value="1">Activo (puede ingresar)</option>
+            <option value="0">Suspendido (bloqueado)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Tipo de plan</span>
+          <select id="sPlanType">
+            <option value="trial">Prueba gratis</option>
+            <option value="paid">Suscripción paga (Gs. 30.000/mes)</option>
+            <option value="vip">⭐ VIP sin costo (ilimitado)</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="sPlanEndsWrap" class="stack">
+        <label class="field">
+          <span>Vencimiento del plan</span>
+          <input type="date" id="sPlanEnds" />
+        </label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-ghost btn-sm" data-add-days="30">+30 días</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-add-days="40">+40 días</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-add-days="60">+60 días</button>
+        </div>
+      </div>
+
+      <p id="sellerError" class="error-text" hidden></p>
+
+      <div class="sheet-actions">
+        <button type="button" id="deleteSellerBtn" class="btn btn-danger" hidden>Eliminar vendedor</button>
+        <button type="submit" class="btn btn-primary" id="saveSellerBtn">Guardar vendedor</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal de pago de suscripción (Alias + Comprobante) -->
+  <dialog id="paymentModal" class="sheet" style="max-width:460px;border-radius:22px;padding:0;overflow:hidden;">
+    <form id="paymentForm" method="dialog" class="stack" style="padding:20px;gap:14px;background:#fff;">
+      <div class="sheet-head" style="margin:0;padding-bottom:10px;border-bottom:1px solid #f1f5f9;">
+        <h3 style="margin:0;">💳 Renovar suscripción (+30 días)</h3>
+        <button type="button" id="closePaymentBtn" class="icon-btn" aria-label="Cerrar">✕</button>
+      </div>
+
+      <p class="muted" style="margin:0;font-size:13px;line-height:1.45;">
+        Seguí estos 2 pasos para acreditar <strong>+30 días</strong> al instante en tu tienda:
+      </p>
+
+      <!-- Paso 1: Datos de transferencia -->
+      <div style="background:linear-gradient(135deg,#0f172a 0%,#3b0a1b 100%);color:#fff;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#fda4af;">
+          Paso 1 · Transferí Gs. 30.000 por SIPAP / Alias
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:10px 12px;">
+          <div>
+            <div style="font-size:11px;color:#cbd5e1;">Alias (C.I.)</div>
+            <div style="font-size:20px;font-weight:800;letter-spacing:.04em;">4056694</div>
+          </div>
+          <button type="button" id="copyAliasBtn" class="btn btn-primary btn-sm" style="background:#f43f5e;border:none;white-space:nowrap;">
+            📋 Copiar alias
+          </button>
+        </div>
+
+        <div style="font-size:12.5px;color:#e2e8f0;line-height:1.5;">
+          <div><strong>Titular:</strong> Christian Gonzalez Vazquez</div>
+          <div><strong>Monto:</strong> Gs. 30.000 (30 días)</div>
+          <div><strong>WhatsApp soporte:</strong> 0994 354 894</div>
+        </div>
+      </div>
+
+      <!-- Paso 2: Subir comprobante (se habilita al copiar el alias) -->
+      <div id="payUploadBox" style="background:#FAF7F5;border:1px solid #EFE8E3;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;opacity:.6;transition:opacity .2s;">
+        <div style="font-size:12px;font-weight:700;color:#0f172a;">
+          Paso 2 · Subí la captura (screenshot) de tu comprobante
+        </div>
+        <p id="payUploadHint" class="muted" style="margin:0;font-size:12px;">
+          Tocá <strong>Copiar alias</strong> arriba para habilitar la carga del comprobante.
+        </p>
+        <input type="file" id="payReceiptFile" accept="image/*" disabled required />
+        <button type="submit" id="submitPaymentBtn" class="btn btn-primary" disabled>
+          Subir comprobante y activar +30 días
+        </button>
+      </div>
+
+      <p id="payMsg" class="ok-text" hidden style="margin:0;"></p>
+      <p id="payError" class="error-text" hidden style="margin:0;"></p>
     </form>
   </dialog>
 

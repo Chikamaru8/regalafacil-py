@@ -9,6 +9,9 @@ import {
   sendEmail
 } from '../admin/_email.js';
 
+const DEFAULT_TRIAL_DAYS = 60;
+const DAY_SEC = 86400;
+
 function slugify(text) {
   return String(text || '')
     .normalize('NFD')
@@ -24,6 +27,18 @@ function normalizePhone(phone) {
   if (!d) return '';
   if (d.startsWith('0')) d = '595' + d.slice(1);
   return d;
+}
+
+async function ensureSellerPlanColumns(db) {
+  const alters = [
+    "ALTER TABLE seller ADD COLUMN plan_type TEXT DEFAULT 'trial'",
+    'ALTER TABLE seller ADD COLUMN plan_ends_at INTEGER',
+    'ALTER TABLE seller ADD COLUMN created_at INTEGER',
+    'ALTER TABLE seller ADD COLUMN last_login_at INTEGER'
+  ];
+  for (const sql of alters) {
+    try { await db.prepare(sql).run(); } catch {}
+  }
 }
 
 async function logOnboardingEvent(db, payload) {
@@ -92,6 +107,8 @@ export async function onRequestPost({ request, env }) {
     return Response.json({ error: 'Ingresá un número de WhatsApp válido (ej. 0981 123 456)' }, { status: 400 });
   }
 
+  await ensureSellerPlanColumns(env.DB);
+
   const existing = await env.DB.prepare('SELECT id FROM seller WHERE lower(email) = ? LIMIT 1')
     .bind(email).first();
 
@@ -114,13 +131,14 @@ export async function onRequestPost({ request, env }) {
 
   const passwordHash = await hashPassword(password);
   const now = Math.floor(Date.now() / 1000);
+  const planEndsAt = now + DEFAULT_TRIAL_DAYS * DAY_SEC;
 
   let insertRes;
   try {
     insertRes = await env.DB.prepare(
-      `INSERT INTO seller (slug, name, city, phone, email, password_hash, approval_status, active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'approved', 1, ?)`
-    ).bind(candidateSlug, name, city, phone, email, passwordHash, now).run();
+      `INSERT INTO seller (slug, name, city, phone, email, password_hash, approval_status, active, plan_type, plan_ends_at, created_at, last_login_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'approved', 1, 'trial', ?, ?, ?)`
+    ).bind(candidateSlug, name, city, phone, email, passwordHash, planEndsAt, now, now).run();
   } catch {
     insertRes = await env.DB.prepare(
       `INSERT INTO seller (slug, name, phone, email, password_hash, approval_status, active, created_at)
@@ -206,6 +224,8 @@ export async function onRequestPost({ request, env }) {
       autoLoggedIn,
       sellerId,
       slug: candidateSlug,
+      plan_type: 'trial',
+      plan_ends_at: planEndsAt,
       welcomeEmailSent: welcomeMail.sent,
       message: '¡Cuenta creada! Ingresando a tu panel...'
     }),

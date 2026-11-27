@@ -141,6 +141,151 @@ function renderSellerShareBanner() {
   }
 }
 
+function renderSellerPlanBanner() {
+  const host = $('#sellerPlanBanner');
+  if (!isSellerSession()) {
+    if (host) host.remove();
+    return;
+  }
+
+  const sess = state.data?.session || {};
+  const planType = String(sess.plan_type || 'trial').toLowerCase();
+  const endsAt = Number(sess.plan_ends_at || 0);
+  const DAY_SEC = 86400;
+  const now = nowSec();
+
+  let box = $('#sellerPlanBanner');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'sellerPlanBanner';
+    box.className = 'settings-card';
+    box.style.marginBottom = '14px';
+    const productsTab = $('#tab-products');
+    if (productsTab) productsTab.prepend(box);
+  }
+
+  if (planType === 'vip') {
+    box.style.background = '#f0fdf4';
+    box.style.borderColor = '#bbf7d0';
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div>
+          <strong style="font-size:13px;color:#15803d;">⭐ Plan VIP sin costo activo</strong>
+          <div class="muted" style="font-size:12px;">Tenés acceso libre e ilimitado por ser parte de los primeros aliados de RegaláFácil PY.</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const diffDays = endsAt ? Math.ceil((endsAt - now) / DAY_SEC) : 60;
+  const fechaVenc = endsAt
+    ? new Date(endsAt * 1000).toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : '';
+
+  let title = '';
+  let subtitle = '';
+  let bg = '#fff';
+  let border = '#e2e8f0';
+
+  if (diffDays > 0) {
+    const label = planType === 'paid' ? 'Suscripción activa' : 'Prueba gratis activa';
+    title = `⏳ ${label}: te quedan ${diffDays} ${diffDays === 1 ? 'día' : 'días'}`;
+    subtitle = fechaVenc
+      ? `Vence el ${fechaVenc}. Renovación mensual: Gs. 30.000.`
+      : 'Renovación mensual: Gs. 30.000.';
+    if (diffDays <= 7) {
+      bg = '#fffbeb';
+      border = '#fde68a';
+    }
+  } else if (diffDays >= -2) {
+    const graceLeft = 2 + diffDays;
+    bg = '#fff7ed';
+    border = '#fdba74';
+    title = `⚠️ Tu plan venció · Tenés ${graceLeft} ${graceLeft === 1 ? 'día' : 'días'} de gracia`;
+    subtitle = 'Realizá tu pago de Gs. 30.000 y subí el comprobante para sumar +30 días al instante.';
+  } else {
+    bg = '#fef2f2';
+    border = '#fecaca';
+    title = '⛔ Tu suscripción está vencida';
+    subtitle = 'Aboná Gs. 30.000 por Alias y subí tu comprobante para reactivar tu tienda al instante.';
+  }
+
+  box.style.background = bg;
+  box.style.borderColor = border;
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div>
+        <strong style="font-size:13px;color:#0f172a;">${escapeHtml(title)}</strong>
+        <div class="muted" style="font-size:12px;">${escapeHtml(subtitle)}</div>
+      </div>
+      <button type="button" id="openPaymentModalBtn" class="btn btn-primary btn-sm">💳 Realizar pago</button>
+    </div>
+  `;
+
+  const openBtn = $('#openPaymentModalBtn');
+  if (openBtn) {
+    openBtn.addEventListener('click', () => {
+      $('#payMsg').hidden = true;
+      $('#payError').hidden = true;
+      $('#payReceiptFile').value = '';
+      $('#payReceiptFile').disabled = true;
+      $('#submitPaymentBtn').disabled = true;
+      $('#payUploadBox').style.opacity = '.6';
+      $('#payUploadHint').innerHTML = 'Tocá <strong>Copiar alias</strong> arriba para habilitar la carga del comprobante.';
+      $('#copyAliasBtn').textContent = '📋 Copiar alias';
+      $('#paymentModal')?.showModal();
+    });
+  }
+}
+
+$('#closePaymentBtn')?.addEventListener('click', () => $('#paymentModal')?.close());
+
+$('#copyAliasBtn')?.addEventListener('click', async () => {
+  const alias = '4056694';
+  try {
+    await navigator.clipboard.writeText(alias);
+  } catch {}
+  $('#copyAliasBtn').textContent = '✅ Alias copiado';
+  $('#payReceiptFile').disabled = false;
+  $('#submitPaymentBtn').disabled = false;
+  $('#payUploadBox').style.opacity = '1';
+  $('#payUploadHint').textContent = '¡Listo! Una vez hecha la transferencia, seleccioná la captura aquí abajo.';
+});
+
+$('#paymentForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#payMsg').hidden = true;
+  $('#payError').hidden = true;
+
+  const file = $('#payReceiptFile')?.files?.[0];
+  if (!file) {
+    $('#payError').textContent = 'Seleccioná la captura de tu comprobante.';
+    $('#payError').hidden = false;
+    return;
+  }
+
+  $('#submitPaymentBtn').disabled = true;
+  $('#submitPaymentBtn').textContent = 'Enviando comprobante...';
+
+  try {
+    const compressed = await compressImageFile(file);
+    const fd = new FormData();
+    fd.append('receipt', compressed, 'comprobante.webp');
+    const res = await api('/api/seller/payment', { method: 'POST', body: fd });
+    $('#payMsg').textContent = res.message || '¡Pago registrado! Sumamos +30 días a tu cuenta.';
+    $('#payMsg').hidden = false;
+    await refreshBootstrap();
+    setTimeout(() => $('#paymentModal')?.close(), 1800);
+  } catch (err) {
+    $('#payError').textContent = err.message;
+    $('#payError').hidden = false;
+  } finally {
+    $('#submitPaymentBtn').disabled = false;
+    $('#submitPaymentBtn').textContent = 'Subir comprobante y activar +30 días';
+  }
+});
+
 function applyRoleUi() {
   const isSeller = isSellerSession();
   const badge = $('#roleBadge');
@@ -174,6 +319,7 @@ function applyRoleUi() {
   }
 
   renderSellerShareBanner();
+  renderSellerPlanBanner();
 }
 
 async function showApp() {
