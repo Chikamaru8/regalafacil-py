@@ -176,7 +176,7 @@ function renderCities() {
     const key = city.toLowerCase();
     const checked = state.cities.includes(key) ? "checked" : "";
     return `
-      <label class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-50 cursor-pointer text-xs font-medium text-slate-700 select-none">
+      <label class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-[#FAF7F5] cursor-pointer text-xs font-medium text-slate-700 select-none">
         <input
           type="checkbox"
           value="${esc(key)}"
@@ -290,7 +290,7 @@ function renderCategories() {
   (appData.categories || [])
     .filter(c => activeCatIds.has(String(c.id)))
     .forEach(c => {
-      html += `<button onclick="setCategoryFilter('${c.id}', this)" class="cat-chip shrink-0 px-3.5 py-2 rounded-2xl text-xs font-semibold bg-white text-slate-700 border border-slate-200/90 hover:border-slate-300 flex items-center gap-1.5 transition cursor-pointer"><span>📁</span> ${esc(c.name)}</button>`;
+      html += `<button onclick="setCategoryFilter('${c.id}', this)" class="cat-chip shrink-0 px-3.5 py-2 rounded-2xl text-xs font-semibold bg-[#F6F1EE] text-slate-700 border border-[#E7DDD7] hover:border-slate-400 flex items-center gap-1.5 transition cursor-pointer"><span>📁</span> ${esc(c.name)}</button>`;
     });
 
   container.innerHTML = html;
@@ -396,25 +396,28 @@ function renderProducts() {
     const catObj = (appData.categories || []).find(c => c.id === p.category_id);
     const catStr = catObj ? catObj.name : 'General';
     const cityStr = String(p?.attributes?.city || '').trim();
-    const badgeText = p.attributes?.badge || (hasOffer ? 'Oferta' : 'Ideal regalo');
+    const customBadge = p.attributes?.badge ? String(p.attributes.badge).trim() : '';
+    const badgeHtml = hasOffer
+      ? `<span class="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-brand-600 text-white shadow-sm">Oferta</span>`
+      : (customBadge
+          ? `<span class="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/95 text-slate-800 shadow-xs">${esc(customBadge)}</span>`
+          : '');
 
     return `
       <article
         onclick="openProductModal(${p.id})"
         style="animation-delay: ${index * 25}ms"
-        class="animate-pop bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xs hover:shadow-md transition flex flex-col cursor-pointer active:scale-[0.98]"
+        class="animate-pop bg-white rounded-3xl overflow-hidden border border-[#EFE8E3] shadow-sm hover:shadow-md transition flex flex-col cursor-pointer active:scale-[0.98]"
       >
-        <div class="relative aspect-square bg-slate-100 overflow-hidden">
+        <div class="relative aspect-square bg-[#F6F1EE] overflow-hidden">
           <img src="${imgUrl}" alt="${esc(p.name)}" loading="lazy" class="w-full h-full object-cover hover:scale-105 transition duration-300">
-          <span class="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/95 text-slate-800 shadow-xs">
-            ${esc(badgeText)}
-          </span>
+          ${badgeHtml}
         </div>
 
         <div class="p-3.5 flex-1 flex flex-col justify-between gap-2">
           <div>
-            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">${esc(catStr)}${cityStr ? ` · ${esc(cityStr)}` : ''}</span>
-            <h4 class="font-display font-bold text-xs sm:text-sm text-slate-800 line-clamp-2 leading-snug mt-0.5">
+            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">${esc(catStr)}${cityStr ? ` · ${esc(cityStr)}` : ''}</span>
+            <h4 class="font-display font-bold text-xs sm:text-sm text-slate-900 line-clamp-2 leading-snug mt-0.5">
               ${esc(p.name)}
             </h4>
           </div>
@@ -424,7 +427,7 @@ function renderProducts() {
               <p class="font-display font-extrabold text-sm sm:text-base text-brand-600">${formatGs(price)}</p>
               ${hasOffer ? `<s class="text-[11px] text-slate-400">${formatGs(p.price_gs)}</s>` : ''}
             </div>
-            <div class="mt-2 w-full py-2 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] flex items-center justify-center gap-1 border border-emerald-200/60 transition">
+            <div class="mt-2.5 w-full py-2.5 px-3 rounded-xl bg-whatsapp-500 hover:bg-whatsapp-600 text-white font-bold text-xs shadow-sm shadow-emerald-500/20 flex items-center justify-center gap-1.5 transition">
               <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
               <span>Me interesa</span>
             </div>
@@ -464,7 +467,7 @@ function handleSort(val) {
 function setBudgetFilter(max, btnEl) {
   state.maxBudget = max;
   document.querySelectorAll(".budget-chip").forEach(btn => {
-    btn.className = "budget-chip shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:border-slate-300 transition cursor-pointer";
+    btn.className = "budget-chip shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[#F6F1EE] text-slate-700 border border-[#E7DDD7] hover:border-slate-400 transition cursor-pointer";
   });
   if (btnEl) {
     btnEl.className = "budget-chip active shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 text-white shadow-sm transition cursor-pointer";
@@ -476,7 +479,7 @@ function setBudgetFilter(max, btnEl) {
 function setCategoryFilter(catId, btnEl) {
   state.categoryId = catId;
   document.querySelectorAll(".cat-chip").forEach(btn => {
-    btn.className = "cat-chip shrink-0 px-3.5 py-2 rounded-2xl text-xs font-semibold bg-white text-slate-700 border border-slate-200/90 hover:border-slate-300 flex items-center gap-1.5 transition cursor-pointer";
+    btn.className = "cat-chip shrink-0 px-3.5 py-2 rounded-2xl text-xs font-semibold bg-[#F6F1EE] text-slate-700 border border-[#E7DDD7] hover:border-slate-400 flex items-center gap-1.5 transition cursor-pointer";
   });
   if (btnEl) {
     btnEl.className = "cat-chip active shrink-0 px-3.5 py-2 rounded-2xl text-xs font-bold bg-brand-600 text-white shadow-sm shadow-brand-500/20 flex items-center gap-1.5 transition cursor-pointer";
