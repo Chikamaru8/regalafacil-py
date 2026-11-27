@@ -1,5 +1,51 @@
 import { getSession } from './_auth.js';
 
+const DEFAULT_CATEGORIES = [
+  { slug: 'perfumes-y-fragancias', name: 'Perfumes y Fragancias', sort_order: 10 },
+  { slug: 'flores-desayunos-y-regalos', name: 'Flores, Desayunos y Regalos', sort_order: 20 },
+  { slug: 'relojes-joyas-y-accesorios', name: 'Relojes, Joyas y Accesorios', sort_order: 30 },
+  { slug: 'moda-ropa-y-calzados', name: 'Moda, Ropa y Calzados', sort_order: 40 },
+  { slug: 'belleza-y-cuidado-personal', name: 'Belleza y Cuidado Personal', sort_order: 50 },
+  { slug: 'tecnologia-y-accesorios', name: 'Tecnología y Accesorios', sort_order: 60 },
+  { slug: 'termos-y-bazar', name: 'Termos, Parrilla y Bazar', sort_order: 70 },
+  { slug: 'hogar-y-descanso', name: 'Hogar, Deco y Descanso', sort_order: 80 },
+  { slug: 'herramientas-y-ferreteria', name: 'Herramientas y Ferretería', sort_order: 90 },
+  { slug: 'vehiculos-y-equipamiento', name: 'Vehículos y Equipamiento', sort_order: 100 },
+  { slug: 'deportes-camping-y-pesca', name: 'Deportes, Camping y Pesca', sort_order: 110 },
+  { slug: 'juguetes-bebes-y-ninos', name: 'Juguetes, Bebés y Niños', sort_order: 120 },
+  { slug: 'bebidas-dulces-y-gourmet', name: 'Bebidas, Dulces y Gourmet', sort_order: 130 },
+  { slug: 'viajes-y-maletas', name: 'Viajes, Mochilas y Maletas', sort_order: 140 },
+  { slug: 'libreria-y-oficina', name: 'Librería, Oficina y Estudio', sort_order: 150 },
+  { slug: 'mascotas-y-accesorios', name: 'Mascotas y Accesorios', sort_order: 160 },
+  { slug: 'salud-y-bienestar', name: 'Salud y Bienestar', sort_order: 170 },
+  { slug: 'otros-y-personalizados', name: 'Otros / Personalizados', sort_order: 180 }
+];
+
+const DEFAULT_TAGS = [
+  { group_key: 'recipient', slug: 'hombre', label: 'Hombre' },
+  { group_key: 'recipient', slug: 'mujer', label: 'Mujer' },
+  { group_key: 'recipient', slug: 'mama', label: 'Mamá' },
+  { group_key: 'recipient', slug: 'papa', label: 'Papá' },
+  { group_key: 'recipient', slug: 'pareja', label: 'Pareja' },
+  { group_key: 'recipient', slug: 'amigo-a', label: 'Amigo/a' },
+  { group_key: 'age', slug: 'nino-a', label: 'Niño/a' },
+  { group_key: 'age', slug: 'joven', label: 'Joven' },
+  { group_key: 'age', slug: 'adulto', label: 'Adulto' },
+  { group_key: 'age', slug: 'adulto-mayor', label: 'Adulto mayor' },
+  { group_key: 'occasion', slug: 'cumpleanos', label: 'Cumpleaños' },
+  { group_key: 'occasion', slug: 'aniversario', label: 'Aniversario' },
+  { group_key: 'occasion', slug: 'dia-de-los-enamorados', label: 'San Valentín' },
+  { group_key: 'occasion', slug: 'navidad', label: 'Navidad' }
+];
+
+function normText(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 async function ensureSellerPlanColumns(db) {
   const alters = [
     "ALTER TABLE seller ADD COLUMN plan_type TEXT DEFAULT 'trial'",
@@ -12,13 +58,65 @@ async function ensureSellerPlanColumns(db) {
   }
 }
 
+async function ensureDefaultCategories(db) {
+  try {
+    const { results: existing } = await db.prepare('SELECT id, slug, name FROM category').all();
+    const rows = existing || [];
+
+    for (const cat of DEFAULT_CATEGORIES) {
+      const found = rows.find((r) =>
+        normText(r.slug) === normText(cat.slug) ||
+        normText(r.name) === normText(cat.name) ||
+        (cat.slug === 'termos-y-bazar' && normText(r.name).includes('termos')) ||
+        (cat.slug === 'hogar-y-descanso' && normText(r.name).includes('hogar')) ||
+        (cat.slug === 'viajes-y-maletas' && normText(r.name).includes('viajes')) ||
+        (cat.slug === 'tecnologia-y-accesorios' && normText(r.name).includes('tecnologia'))
+      );
+
+      if (found) {
+        await db.prepare('UPDATE category SET name = ?, sort_order = ?, active = 1 WHERE id = ?')
+          .bind(cat.name, cat.sort_order, found.id).run();
+      } else {
+        await db.prepare('INSERT INTO category (slug, name, sort_order, active) VALUES (?, ?, ?, 1)')
+          .bind(cat.slug, cat.name, cat.sort_order).run();
+      }
+    }
+  } catch (err) {
+    console.error('Error sincronizando categorías:', err);
+  }
+}
+
+async function ensureDefaultTags(db) {
+  try {
+    const { results: existing } = await db.prepare('SELECT id, slug, label FROM tag').all();
+    const rows = existing || [];
+
+    for (const t of DEFAULT_TAGS) {
+      const found = rows.find((r) =>
+        normText(r.slug) === normText(t.slug) ||
+        normText(r.label) === normText(t.label)
+      );
+      if (!found) {
+        await db.prepare('INSERT INTO tag (group_key, slug, label) VALUES (?, ?, ?)')
+          .bind(t.group_key, t.slug, t.label).run();
+      }
+    }
+  } catch (err) {
+    console.error('Error sincronizando etiquetas:', err);
+  }
+}
+
 export async function onRequestGet({ request, env, data }) {
   const session = data?.session || (await getSession(request, env));
   if (!session) {
     return Response.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  await ensureSellerPlanColumns(env.DB);
+  await Promise.all([
+    ensureSellerPlanColumns(env.DB),
+    ensureDefaultCategories(env.DB),
+    ensureDefaultTags(env.DB)
+  ]);
 
   const isSeller = session.role === 'seller' && Boolean(session.sellerId);
   const sellerId = isSeller ? Number(session.sellerId) : null;
@@ -87,7 +185,7 @@ export async function onRequestGet({ request, env, data }) {
     { results: leads }
   ] = await Promise.all([
     env.DB.prepare('SELECT key, value FROM settings').all(),
-    env.DB.prepare('SELECT id, slug, name, sort_order, active FROM category ORDER BY sort_order ASC, id ASC').all(),
+    env.DB.prepare('SELECT id, slug, name, sort_order, active FROM category WHERE active = 1 ORDER BY sort_order ASC, id ASC').all(),
     env.DB.prepare('SELECT id, group_key, slug, label FROM tag ORDER BY id ASC').all(),
     sellersQuery.all(),
     productsQuery.all(),

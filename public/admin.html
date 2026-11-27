@@ -9,28 +9,30 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/admin.css" />
   <style>
-    /* Modal de producto guiado e intuitivo (Celular + PC) */
-    #productModal.sheet{width:100vw;max-width:660px;height:auto;max-height:92vh;margin:auto;padding:0;border-radius:22px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 24px 48px rgba(15,23,42,.18)}
+    /* Modal de producto completo, ordenado y sin cajas aplastadas */
+    #productModal.sheet{width:100vw;max-width:740px;height:auto;max-height:92vh;margin:auto;padding:0;border-radius:22px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 24px 48px rgba(15,23,42,.18)}
     #productModal .modal-shell{display:flex;flex-direction:column;max-height:92vh;background:#f8fafc}
     #productModal .sheet-head{padding:15px 20px;background:#fff;border-bottom:1px solid #e2e8f0;margin:0;flex-shrink:0;display:flex;justify-content:space-between;align-items:center}
     #productModal .mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#e2e8f0;padding:4px;margin:12px 20px 0;border-radius:12px;flex-shrink:0}
     #productModal .mode-btn{border:none;background:transparent;padding:9px 10px;border-radius:9px;font-size:13px;font-weight:700;color:#475569;cursor:pointer;transition:all .15s}
     #productModal .mode-btn.active{background:#fff;color:#e11d48;box-shadow:0 2px 6px rgba(15,23,42,.08)}
-    #productModal .modal-body{flex:1;overflow-y:auto;padding:14px 20px 18px;display:flex;flex-direction:column;gap:12px}
-    #productModal .form-block{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
-    #productModal .step-badge{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:#e11d48;text-transform:uppercase;letter-spacing:.04em;margin:0}
+    #productModal .modal-body{flex:1;overflow-y:auto;padding:14px 20px 20px;display:flex;flex-direction:column;gap:14px}
+    #productModal .form-block{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;flex-shrink:0}
+    #productModal .step-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#e11d48;text-transform:uppercase;letter-spacing:.04em;margin:0;border-bottom:1px solid #f1f5f9;padding-bottom:8px}
     #productModal .photo-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:18px 14px;border:2px dashed #cbd5e1;border-radius:14px;background:#f8fafc;cursor:pointer;text-align:center;transition:border-color .15s,background .15s}
     #productModal .photo-drop:hover{border-color:#e11d48;background:#fff1f2}
     #productModal .photo-drop-icon{font-size:28px;line-height:1}
     #productModal .photo-drop-title{font-size:14px;font-weight:700;color:#0f172a}
     #productModal .photo-drop-sub{font-size:12px;color:#64748b}
-    #productModal details.opt-accordion{background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden}
-    #productModal details.opt-accordion > summary{list-style:none;padding:14px 16px;font-size:13.5px;font-weight:700;color:#0f172a;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+    #productModal details.opt-accordion{background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:visible;flex-shrink:0}
+    #productModal details.opt-accordion > summary{list-style:none;padding:15px 16px;font-size:13.5px;font-weight:700;color:#0f172a;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
     #productModal details.opt-accordion > summary::-webkit-details-marker{display:none}
     #productModal details.opt-accordion > summary::after{content:'＋';font-size:16px;color:#64748b;font-weight:800}
-    #productModal details.opt-accordion[open] > summary{border-bottom:1px solid #f1f5f9;background:#f8fafc}
+    #productModal details.opt-accordion[open] > summary{border-bottom:1px solid #f1f5f9;background:#fffbeb;border-radius:16px 16px 0 0}
     #productModal details.opt-accordion[open] > summary::after{content:'－';color:#e11d48}
     #productModal .opt-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+    #productModal .tag-group-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+    #productModal .tag-group-title{font-size:11.5px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.03em;margin:0}
     #productModal .ai-block{background:linear-gradient(180deg,#fff1f2 0%,#fff 100%);border:1px solid #fecdd3}
     #productModal .ai-steps{margin:0;padding-left:18px;font-size:13px;color:#334155;line-height:1.55}
     #productModal .ai-steps li{margin-bottom:4px}
@@ -43,7 +45,7 @@
       #productModal.sheet{width:100vw;height:100dvh;max-height:100dvh;border-radius:0;border:none}
       #productModal .modal-shell{height:100dvh;max-height:100dvh}
       #productModal .mode-switch{margin:10px 14px 0}
-      #productModal .modal-body{padding:12px 14px 16px}
+      #productModal .modal-body{padding:12px 14px 20px}
       #productModal .sheet-actions{padding:12px 14px}
     }
 
@@ -438,7 +440,7 @@
     </nav>
   </div>
 
-  <!-- Modal guiado e intuitivo para crear o editar producto -->
+  <!-- Modal completo y ordenado por pasos para crear o editar producto -->
   <dialog id="productModal" class="sheet">
     <form id="productForm" method="dialog" class="modal-shell">
       <div class="sheet-head">
@@ -448,14 +450,14 @@
 
       <!-- Selector de modo: Carga directa vs Carga asistida por IA -->
       <div class="mode-switch" role="tablist">
-        <button type="button" class="mode-btn active" id="tabModeManual">⚡ Carga rápida (1x1)</button>
+        <button type="button" class="mode-btn active" id="tabModeManual">⚡ Carga directa (Paso a paso)</button>
         <button type="button" class="mode-btn" id="tabModeAi">🤖 Ayuda con IA (Varios)</button>
       </div>
 
       <input type="hidden" id="prodId" />
 
       <div class="modal-body">
-        <!-- SECCIÓN IA (Oculta por defecto para no saturar la vista) -->
+        <!-- SECCIÓN IA (Visible al tocar la pestaña "Ayuda con IA") -->
         <div id="aiModeSection" class="form-block ai-block" hidden>
           <p class="step-badge">🤖 Autocompletar con Inteligencia Artificial</p>
           <ol class="ai-steps">
@@ -496,41 +498,69 @@
           <p id="aiHelperMsg" class="muted" style="margin:0;font-size:12px;"></p>
         </div>
 
-        <!-- PASO 1: FOTO DE PORTADA -->
+        <!-- PASO 1: FOTOS (Portada + Galería ordenable + Colores) -->
         <div class="form-block">
-          <p class="step-badge">Paso 1 · Foto principal</p>
+          <p class="step-badge">📸 Paso 1 · Fotos y variantes de color</p>
+
           <label class="photo-drop" id="photoDropLabel" for="prodImageFile">
             <span class="photo-drop-icon">📸</span>
-            <span class="photo-drop-title">Tocá aquí para elegir o sacar una foto</span>
-            <span class="photo-drop-sub">Se comprime y ajusta sola automáticamente</span>
+            <span class="photo-drop-title">Tocá aquí para elegir la Foto Principal (Portada)</span>
+            <span class="photo-drop-sub">Se comprime y optimiza sola automáticamente</span>
             <input type="file" id="prodImageFile" accept="image/*" style="display:none;" />
           </label>
           <div id="prodImagePreview" class="img-preview"></div>
+
+          <!-- Galería adicional siempre visible y con soporte para arrastrar/ordenar -->
+          <div class="field" style="background:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+              <div>
+                <span style="font-weight:700; font-size:13px; color:#0f172a;">Galería adicional (hasta 7 fotos extra)</span>
+                <small class="muted" style="display:block;font-size:11.5px;">Podés subir varios ángulos y arrastrarlas para cambiar el orden.</small>
+              </div>
+              <label class="btn btn-ghost btn-sm" style="cursor:pointer; margin:0; background:#fff; border:1px solid #cbd5e1;">
+                + Agregar más fotos
+                <input type="file" id="addMoreImagesBtn" accept="image/*" multiple style="display:none;" />
+              </label>
+            </div>
+            <div id="productImagesGallery"></div>
+          </div>
+
+          <!-- Variantes de color -->
+          <div class="field" id="variantsContainerSection" style="background:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <div>
+                <span style="font-weight:700; font-size:13px; color:#0f172a;">Variantes de color / modelo (Opcional)</span>
+                <small class="muted" style="display:block;font-size:11.5px;">Ej: Negro, Rosa, Azul (podés vincular cada color con su foto).</small>
+              </div>
+              <button type="button" id="addVariantBtn" class="btn btn-ghost btn-sm" style="background:#fff;border:1px solid #cbd5e1;">+ Agregar color</button>
+            </div>
+            <div id="productVariantsList" style="display:flex; flex-direction:column; gap:8px;"></div>
+          </div>
         </div>
 
-        <!-- PASO 2: DATOS ESENCIALES -->
+        <!-- PASO 2: DATOS DEL PRODUCTO Y PRECIO -->
         <div class="form-block">
-          <p class="step-badge">Paso 2 · ¿Qué vendés y cuánto cuesta?</p>
+          <p class="step-badge">🏷️ Paso 2 · ¿Qué vendés y cuánto cuesta?</p>
 
           <label class="field">
             <span>Nombre del producto *</span>
-            <input type="text" id="prodName" required placeholder="Ej: Termo Stanley 1L / Ramo de Rosas / Perfume..." />
+            <input type="text" id="prodName" required placeholder="Ej: Termo Stanley 1L / Juego de Herramientas / Perfume..." />
           </label>
 
           <div class="grid-2">
             <label class="field">
-              <span>Precio (Gs.) *</span>
+              <span>Precio normal (Gs.) *</span>
               <input type="number" id="prodPrice" min="1" step="1" required placeholder="150.000" />
             </label>
             <label class="field">
-              <span>Categoría</span>
+              <span>Categoría *</span>
               <select id="prodCategory"></select>
             </label>
           </div>
 
           <label class="field">
             <span>Frase gancho corta (opcional)</span>
-            <input type="text" id="prodShortDetail" maxlength="90" placeholder="Ej: Incluye caja de regalo · Entrega en el día" />
+            <input type="text" id="prodShortDetail" maxlength="90" placeholder="Ej: Original en caja · Garantía · Entrega en el día" />
           </label>
 
           <div class="grid-2">
@@ -557,9 +587,25 @@
           </div>
         </div>
 
-        <!-- OPCIONAL 1: PRECIO DE OFERTA -->
+        <!-- PASO 3: PÚBLICO (HOMBRE/MUJER/EDADES/OCASIÓN) + DESCRIPCIÓN -->
+        <div class="form-block">
+          <p class="step-badge">🎯 Paso 3 · Público, edades y descripción</p>
+
+          <div class="field">
+            <span>Marcá para quién es ideal (Hombre, Mujer, Edades, Ocasión)</span>
+            <small class="muted" style="margin-top:-2px;margin-bottom:4px;display:block;">Esto hace que tu producto aparezca cuando un cliente filtra regalos en el catálogo.</small>
+            <div id="prodTags" class="stack" style="gap:8px;"></div>
+          </div>
+
+          <label class="field">
+            <span>Descripción comercial</span>
+            <textarea id="prodDesc" rows="3" placeholder="Contá qué incluye, medidas, marca o por qué es una excelente opción..."></textarea>
+          </label>
+        </div>
+
+        <!-- PASO 4 (OPCIONAL): OFERTA CON FECHA -->
         <details class="opt-accordion" id="accOffer">
-          <summary>🔥 Poner en Oferta / Descuento (Opcional)</summary>
+          <summary>🔥 Paso 4 · Poner en Oferta / Descuento (Opcional)</summary>
           <div class="opt-body">
             <div class="grid-2">
               <label class="field">
@@ -571,47 +617,7 @@
                 <input type="datetime-local" id="prodOfferEnds" />
               </label>
             </div>
-            <small class="muted">Cuando pase la fecha, vuelve automáticamente a su precio normal.</small>
-          </div>
-        </details>
-
-        <!-- OPCIONAL 2: DESCRIPCIÓN Y ETIQUETAS -->
-        <details class="opt-accordion" id="accDetails">
-          <summary>✍️ Descripción y filtros de regalo (Opcional)</summary>
-          <div class="opt-body">
-            <label class="field">
-              <span>Descripción comercial</span>
-              <textarea id="prodDesc" rows="3" placeholder="Contá qué incluye, medidas, marca o por qué es ideal para regalar..."></textarea>
-            </label>
-            <div class="field">
-              <span>Etiquetas (ayudan a que los clientes filtren tu regalo)</span>
-              <div id="prodTags" class="chips-wrap"></div>
-            </div>
-          </div>
-        </details>
-
-        <!-- OPCIONAL 3: MÁS FOTOS Y COLORES -->
-        <details class="opt-accordion" id="accGallery">
-          <summary>🎨 Más fotos y variantes de color (Opcional)</summary>
-          <div class="opt-body">
-            <div class="field" style="background:#f8fafc; padding:10px; border-radius:10px; border:1px solid #e2e8f0;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <span style="font-weight:600; font-size:13px;">Galería adicional (hasta 7 fotos)</span>
-                <label class="btn btn-ghost btn-sm" style="cursor:pointer; margin:0; background:#fff; border:1px solid #cbd5e1;">
-                  + Agregar fotos
-                  <input type="file" id="addMoreImagesBtn" accept="image/*" multiple style="display:none;" />
-                </label>
-              </div>
-              <div id="productImagesGallery"></div>
-            </div>
-
-            <div class="field" id="variantsContainerSection">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <span>Variantes de color</span>
-                <button type="button" id="addVariantBtn" class="btn btn-ghost btn-sm">+ Agregar color</button>
-              </div>
-              <div id="productVariantsList" style="display:flex; flex-direction:column; gap:8px;"></div>
-            </div>
+            <small class="muted">Cuando pase la fecha indicada, vuelve solo a su precio normal.</small>
           </div>
         </details>
       </div>
