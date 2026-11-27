@@ -41,9 +41,12 @@
     .leads-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
     .leads-controls input,.leads-controls select{padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff}
     .leads-controls input{flex:1;min-width:190px}
-    .auth-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px;background:#f1f5f9;padding:4px;border-radius:10px}
-    .auth-tab{border:none;background:transparent;padding:8px 6px;border-radius:8px;font-size:12px;font-weight:700;color:#475569;cursor:pointer}
-    .auth-tab.active{background:#fff;color:#0f172a;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .auth-foot-links{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:2px;font-size:13px}
+    .auth-link-btn{background:transparent;border:none;padding:0;color:#475569;font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline}
+    .auth-link-btn:hover{color:#0f172a}
+    .auth-register-box{margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:8px;text-align:center}
+    .auth-register-label{margin:0;font-size:12.5px;color:#64748b}
+    .auth-back-row{margin-top:4px;text-align:center}
     .ok-text{color:#15803d;font-size:13px;font-weight:600;margin:6px 0 0}
     .pending-card{border:1px solid #f59e0b;background:#fffbeb;border-radius:12px;padding:12px;margin-bottom:10px}
   </style>
@@ -55,12 +58,6 @@
       <div class="brand-badge">RegaláFácil PY</div>
       <h1>Portal de Gestión</h1>
       <p class="muted">Administradores y vendedores aprobados.</p>
-
-      <div class="auth-tabs" role="tablist" aria-label="Opciones de acceso">
-        <button type="button" role="tab" aria-selected="true" class="auth-tab active" data-auth-mode="login">Ingresar</button>
-        <button type="button" role="tab" aria-selected="false" class="auth-tab" data-auth-mode="register">Registrarse</button>
-        <button type="button" role="tab" aria-selected="false" class="auth-tab" data-auth-mode="forgot">Recuperar</button>
-      </div>
 
       <!-- 1. INICIAR SESIÓN -->
       <form id="loginForm" class="stack">
@@ -76,6 +73,13 @@
           </div>
         </label>
         <button type="submit" class="btn btn-primary" id="loginBtn">Entrar</button>
+        <div class="auth-foot-links">
+          <button type="button" id="openForgotBtn" class="auth-link-btn">Olvidé contraseña</button>
+        </div>
+        <div class="auth-register-box">
+          <p class="auth-register-label">¿Todavía no tenés tu tienda en RegaláFácil PY?</p>
+          <button type="button" id="openRegisterBtn" class="btn btn-ghost btn-sm">Registrate</button>
+        </div>
         <p id="loginError" class="error-text" hidden></p>
       </form>
 
@@ -107,18 +111,35 @@
         <button type="submit" class="btn btn-primary" id="registerBtn">Crear cuenta y entrar</button>
         <p id="registerMsg" class="ok-text" hidden></p>
         <p id="registerError" class="error-text" hidden></p>
+        <div class="auth-back-row">
+          <button type="button" class="auth-link-btn" data-back-login>← Volver a ingresar</button>
+        </div>
       </form>
 
-      <!-- 3. RECUPERAR CONTRASEÑA -->
+      <!-- 3. RECUPERAR CONTRASEÑA (CORREO + WHATSAPP) -->
       <form id="forgotForm" class="stack" hidden>
-        <p class="muted" style="margin:0;">Te enviaremos una contraseña temporal a tu correo registrado.</p>
+        <p class="muted" style="margin:0;">Verificá tu correo y tu WhatsApp registrados para definir una nueva contraseña.</p>
         <label class="field">
           <span>Correo electrónico registrado *</span>
           <input type="email" id="forgotEmail" required placeholder="tu-correo@ejemplo.com" />
         </label>
-        <button type="submit" class="btn btn-primary" id="forgotBtn">Enviar recuperación</button>
+        <label class="field">
+          <span>WhatsApp registrado *</span>
+          <input type="tel" id="forgotPhone" required placeholder="0981 123 456" />
+        </label>
+        <label class="field">
+          <span>Nueva contraseña (mín. 6 caracteres) *</span>
+          <div class="pass-wrap">
+            <input type="password" id="forgotPassword" minlength="6" autocomplete="new-password" required />
+            <button type="button" class="pass-toggle" data-toggle-pass="forgotPassword" aria-label="Mostrar contraseña" title="Mostrar u ocultar contraseña">👁️</button>
+          </div>
+        </label>
+        <button type="submit" class="btn btn-primary" id="forgotBtn">Cambiar contraseña</button>
         <p id="forgotMsg" class="ok-text" hidden></p>
         <p id="forgotError" class="error-text" hidden></p>
+        <div class="auth-back-row">
+          <button type="button" class="auth-link-btn" data-back-login>← Volver a ingresar</button>
+        </div>
       </form>
     </div>
   </section>

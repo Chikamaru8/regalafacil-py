@@ -53,11 +53,6 @@ async function api(path, opts = {}) {
 }
 
 function setAuthMode(mode) {
-  document.querySelectorAll('.auth-tab').forEach((btn) => {
-    const isActive = btn.dataset.authMode === mode;
-    btn.classList.toggle('active', isActive);
-    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
-  });
   $('#loginForm').hidden = mode !== 'login';
   $('#registerForm').hidden = mode !== 'register';
   $('#forgotForm').hidden = mode !== 'forgot';
@@ -68,8 +63,10 @@ function setAuthMode(mode) {
   $('#forgotMsg').hidden = true;
 }
 
-document.querySelectorAll('.auth-tab').forEach((btn) => {
-  btn.addEventListener('click', () => setAuthMode(btn.dataset.authMode));
+$('#openForgotBtn')?.addEventListener('click', () => setAuthMode('forgot'));
+$('#openRegisterBtn')?.addEventListener('click', () => setAuthMode('register'));
+document.querySelectorAll('[data-back-login]').forEach((btn) => {
+  btn.addEventListener('click', () => setAuthMode('login'));
 });
 
 document.querySelectorAll('.pass-toggle').forEach((btn) => {
@@ -87,7 +84,8 @@ function showLogin(msg = '') {
   state.data = null;
   $('#adminApp').hidden = true;
   $('#loginView').hidden = false;
-  setAuthMode('login');
+  const startInRegister = new URLSearchParams(window.location.search).get('modo') === 'registro';
+  setAuthMode(startInRegister ? 'register' : 'login');
   $('#loginError').textContent = msg;
   $('#loginError').hidden = !msg;
 }
@@ -573,7 +571,7 @@ function exportLeadsToExcel() {
   const stamp = new Date().toISOString().slice(0, 10);
   a.href = url;
   a.download = `pedidos-regalafacil-${stamp}.csv`;
-   
+
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1426,13 +1424,16 @@ $('#forgotForm').addEventListener('submit', async (e) => {
   $('#forgotMsg').hidden = true;
   $('#forgotBtn').disabled = true;
   try {
-    const res = await api('/api/seller/forgot-password', {
+    const res = await api('/api/seller/recover', {
       method: 'POST',
       body: JSON.stringify({
-        email: $('#forgotEmail').value.trim()
+        email: $('#forgotEmail').value.trim(),
+        phone: $('#forgotPhone').value.trim(),
+        password: $('#forgotPassword').value
       })
     });
-    $('#forgotMsg').textContent = res.message || 'Revisá tu correo para ver las instrucciones.';
+    $('#forgotForm').reset();
+    $('#forgotMsg').textContent = res.message || 'Contraseña actualizada. Ya podés ingresar.';
     $('#forgotMsg').hidden = false;
   } catch (err) {
     $('#forgotError').textContent = err.message;

@@ -60,18 +60,25 @@
     }
   </style>
 </head>
-<body class="text-slate-800 antialiased min-h-screen flex flex-col pb-24">
+<body class="text-slate-800 antialiased min-h-screen flex flex-col pb-12">
 
   <!-- CINTA SUPERIOR DE CONFIANZA -->
   <div class="bg-slate-900 text-white text-[11px] sm:text-xs shrink-0">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <span class="flex h-2 w-2 relative">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="flex h-2 w-2 relative shrink-0">
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </span>
-        <span class="text-slate-200 font-medium">Atención directa por WhatsApp con cada tienda</span>
+        <span class="text-slate-200 font-medium truncate">Atención directa por WhatsApp con cada tienda</span>
       </div>
+      <a
+        href="/admin.html"
+        class="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition shrink-0"
+      >
+        <i data-lucide="store" class="w-3.5 h-3.5 text-rose-400"></i>
+        <span>Vendé acá</span>
+      </a>
     </div>
   </div>
 
@@ -263,6 +270,21 @@
         </div>
       </div>
     </main>
+
+    <!-- BLOQUE AL PIE PARA VENDEDORES -->
+    <footer class="mt-4 bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <p class="font-display font-bold text-sm text-slate-900">¿Tenés productos y querés vender en Regalafacil PY?</p>
+        <p class="text-xs text-slate-500 mt-0.5">Creá tu tienda, cargá tus productos y recibí consultas directo por WhatsApp.</p>
+      </div>
+      <a
+        href="/admin.html?modo=registro"
+        class="inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition shrink-0"
+      >
+        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+        <span>Registrarte y cargar producto</span>
+      </a>
+    </footer>
 
   </div>
 
