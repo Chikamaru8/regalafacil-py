@@ -94,59 +94,157 @@ function isSellerSession() {
   return state.data?.session?.role === 'seller';
 }
 
-function renderSellerShareBanner() {
-  const host = $('#sellerShareBanner');
+function getSellerBannersGrid() {
+  let grid = $('#sellerTopBanners');
   if (!isSellerSession()) {
-    if (host) host.remove();
-    return;
+    if (grid) grid.remove();
+    return null;
   }
+  if (!grid) {
+    grid = document.createElement('div');
+    grid.id = 'sellerTopBanners';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-bottom:16px;align-items:stretch;';
+    const productsTab = $('#tab-products');
+    if (productsTab) productsTab.prepend(grid);
+  }
+  return grid;
+}
+
+function downloadSellerPromoImage(sellerName, shareUrl) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080;
+  canvas.height = 1080;
+  const ctx = canvas.getContext('2d');
+
+  // Fondo degradado marca RegaláFácil PY
+  const grad = ctx.createLinearGradient(0, 0, 1080, 1080);
+  grad.addColorStop(0, '#0f172a');
+  grad.addColorStop(1, '#4c0519');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 1080, 1080);
+
+  // Tarjeta central sutil
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(70, 70, 940, 940, 48);
+  ctx.fill();
+  ctx.stroke();
+
+  // Insignia superior
+  ctx.fillStyle = '#e11d48';
+  ctx.beginPath();
+  ctx.roundRect(320, 150, 440, 68, 34);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 30px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('🎁 REGALÁFÁCIL PY', 540, 195);
+
+  // Nombre de la tienda
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '800 64px sans-serif';
+  const cleanName = String(sellerName || 'Mi Tienda').slice(0, 26);
+  ctx.fillText(cleanName, 540, 360);
+
+  // Texto principal
+  ctx.fillStyle = '#fda4af';
+  ctx.font = 'bold 42px sans-serif';
+  ctx.fillText('¡Mis productos ya están online!', 540, 460);
+
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = '34px sans-serif';
+  ctx.fillText('Mirá el catálogo completo y hacé', 540, 560);
+  ctx.fillText('tu pedido directo por WhatsApp', 540, 610);
+
+  // Caja del enlace abajo
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.roundRect(120, 730, 840, 120, 28);
+  ctx.fill();
+
+  ctx.fillStyle = '#64748b';
+  ctx.font = 'bold 24px sans-serif';
+  ctx.fillText('INGRESÁ AQUÍ:', 540, 775);
+
+  ctx.fillStyle = '#e11d48';
+  ctx.font = 'bold 28px sans-serif';
+  const displayUrl = shareUrl.replace(/^https?:\/\//, '');
+  ctx.fillText(displayUrl.slice(0, 44), 540, 822);
+
+  // Descargar PNG
+  const a = document.createElement('a');
+  a.download = `estado-regalafacil-${(sellerName || 'tienda').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`;
+  a.href = canvas.toDataURL('image/png');
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function renderSellerShareBanner() {
+  const grid = getSellerBannersGrid();
+  if (!grid) return;
 
   const slug = state.data?.session?.slug || '';
+  const sellerName = state.data?.session?.name || 'Mi tienda';
   const shareUrl = slug
     ? `${window.location.origin}/?v=${encodeURIComponent(slug)}`
     : `${window.location.origin}/`;
+
+  const promoText = `🎁 ¡Mis productos de *${sellerName}* ahora están en *RegaláFácil PY*!\nMirá mi catálogo y hacé tu pedido directo por WhatsApp aquí 👇\n${shareUrl}`;
 
   let box = $('#sellerShareBanner');
   if (!box) {
     box = document.createElement('div');
     box.id = 'sellerShareBanner';
     box.className = 'settings-card';
-    box.style.marginBottom = '14px';
-    const productsTab = $('#tab-products');
-    if (productsTab) productsTab.prepend(box);
+    box.style.marginBottom = '0';
+    box.style.display = 'flex';
+    box.style.flexDirection = 'column';
+    box.style.justifyContent = 'space-between';
+    box.style.gap = '10px';
+    grid.appendChild(box);
   }
 
   box.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-      <div>
-        <strong style="font-size:13px;">🔗 Tu enlace directo de ventas</strong>
-        <div class="muted" style="font-size:12px;word-break:break-all;">${escapeHtml(shareUrl)}</div>
-      </div>
-      <button type="button" id="copySellerLinkBtn" class="btn btn-ghost btn-sm" style="background:#fff;border:1px solid #cbd5e1;">📋 Copiar enlace</button>
+    <div>
+      <strong style="font-size:13px;color:#0f172a;">🔗 Tu enlace directo de ventas</strong>
+      <div class="muted" style="font-size:12px;margin-top:2px;">Copiá y pegalo en tu estado de WhatsApp o perfil de Instagram.</div>
+      <div class="muted" style="font-size:11.5px;word-break:break-all;margin-top:4px;color:#e11d48;font-weight:600;">${escapeHtml(shareUrl)}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button type="button" id="copySellerLinkBtn" class="btn btn-ghost btn-sm" style="background:#fff;border:1px solid #cbd5e1;">📋 Copiar para estado</button>
+      <button type="button" id="downloadPromoImgBtn" class="btn btn-ghost btn-sm" style="background:#fff;border:1px solid #cbd5e1;">🖼️ Imagen para estado</button>
     </div>
   `;
 
   const copyBtn = $('#copySellerLinkBtn');
-  if (copyBtn && !copyBtn.dataset.listener) {
-    copyBtn.dataset.listener = 'true';
+  if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
       try {
-        await navigator.clipboard.writeText(shareUrl);
-        copyBtn.textContent = '✅ Copiado';
-        setTimeout(() => { copyBtn.textContent = '📋 Copiar enlace'; }, 2000);
+        await navigator.clipboard.writeText(promoText);
+        copyBtn.textContent = '✅ ¡Texto y link copiados!';
+        setTimeout(() => { copyBtn.textContent = '📋 Copiar para estado'; }, 2200);
       } catch {
-        alert(shareUrl);
+        prompt('Copiá este texto para tu estado:', promoText);
       }
+    });
+  }
+
+  const imgBtn = $('#downloadPromoImgBtn');
+  if (imgBtn) {
+    imgBtn.addEventListener('click', () => {
+      downloadSellerPromoImage(sellerName, shareUrl);
+      imgBtn.textContent = '✅ ¡Imagen descargada!';
+      setTimeout(() => { imgBtn.textContent = '🖼️ Imagen para estado'; }, 2200);
     });
   }
 }
 
 function renderSellerPlanBanner() {
-  const host = $('#sellerPlanBanner');
-  if (!isSellerSession()) {
-    if (host) host.remove();
-    return;
-  }
+  const grid = getSellerBannersGrid();
+  if (!grid) return;
 
   const sess = state.data?.session || {};
   const planType = String(sess.plan_type || 'trial').toLowerCase();
@@ -159,20 +257,21 @@ function renderSellerPlanBanner() {
     box = document.createElement('div');
     box.id = 'sellerPlanBanner';
     box.className = 'settings-card';
-    box.style.marginBottom = '14px';
-    const productsTab = $('#tab-products');
-    if (productsTab) productsTab.prepend(box);
+    box.style.marginBottom = '0';
+    box.style.display = 'flex';
+    box.style.flexDirection = 'column';
+    box.style.justifyContent = 'space-between';
+    box.style.gap = '10px';
+    grid.prepend(box);
   }
 
   if (planType === 'vip') {
     box.style.background = '#f0fdf4';
     box.style.borderColor = '#bbf7d0';
     box.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-        <div>
-          <strong style="font-size:13px;color:#15803d;">⭐ Plan VIP sin costo activo</strong>
-          <div class="muted" style="font-size:12px;">Tenés acceso libre e ilimitado por ser parte de los primeros aliados de RegaláFácil PY.</div>
-        </div>
+      <div>
+        <strong style="font-size:13px;color:#15803d;">⭐ Plan VIP sin costo activo</strong>
+        <div class="muted" style="font-size:12px;margin-top:4px;">Tenés acceso libre e ilimitado por ser parte de los primeros aliados de RegaláFácil PY.</div>
       </div>
     `;
     return;
@@ -214,11 +313,11 @@ function renderSellerPlanBanner() {
   box.style.background = bg;
   box.style.borderColor = border;
   box.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-      <div>
-        <strong style="font-size:13px;color:#0f172a;">${escapeHtml(title)}</strong>
-        <div class="muted" style="font-size:12px;">${escapeHtml(subtitle)}</div>
-      </div>
+    <div>
+      <strong style="font-size:13px;color:#0f172a;">${escapeHtml(title)}</strong>
+      <div class="muted" style="font-size:12px;margin-top:4px;">${escapeHtml(subtitle)}</div>
+    </div>
+    <div>
       <button type="button" id="openPaymentModalBtn" class="btn btn-primary btn-sm">💳 Realizar pago</button>
     </div>
   `;
