@@ -936,6 +936,7 @@ function resetAiAssistantUi() {
 function buildAiPrompt(city, phone, sellerName) {
   const categoriesList = (state.data?.categories || []).map((c) => c.name).join(', ') || 'General';
   return [
+    'Respondé ÚNICAMENTE con el código JSON dentro de un bloque de código Markdown JSON.stringify(...), sin texto ni explicaciones antes ni después, para que aparezca el botón de Copiar. Usá esta estructura:',
     'Actuá como redactor comercial experto para la tienda RegaláFácil PY (Paraguay). Analizá cada foto de forma independiente.',
     'REGLAS ESTRICTAS:',
     '- NO describas lo obvio de la imagen (NO digas "frasco azul", "caja original azul", "en la foto se ve...", ni pongas "[Foto #1]").',

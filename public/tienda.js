@@ -88,11 +88,14 @@ function getColorObjects(p) {
 function buildWhatsAppUrl(product, price, ref) {
   const owner = getProductSeller(product);
   const sellerName = owner?.name ? ` (${owner.name})` : "";
-  const productUrl = window.location.origin + window.location.pathname + `?p=${product.id}`;
+  const imgQuery = currentActiveImageId ? `&img=${encodeURIComponent(currentActiveImageId)}` : "";
+  const productUrl = window.location.origin + window.location.pathname + `?p=${product.id}${imgQuery}`;
   const colors = getColorObjects(product);
+  const images = product.images || (product.image_ids ? product.image_ids.map(id => ({ id })) : []);
+  const activeImgIndex = images.findIndex(img => String(img.id) === String(currentActiveImageId));
 
   let message = `¡Hola${sellerName}! Me interesa este producto de *${BRAND_NAME}*:\n\n`;
-  message += `🔍 Ref: *#${ref}*\n`;
+  message += `🔖 Ref: *#${ref}*\n`;
   message += `🛍️ Producto: *${product.name}*\n`;
   message += `💰 Precio: *${formatGs(price)}*\n`;
 
@@ -102,6 +105,8 @@ function buildWhatsAppUrl(product, price, ref) {
 
   if (selectedColor) {
     message += `🎨 Variante elegida: *${selectedColor}*\n`;
+  } else if (images.length > 1 && activeImgIndex >= 0) {
+    message += `📸 Foto seleccionada: *Foto #${activeImgIndex + 1}*\n`;
   } else if (colors.length === 1) {
     message += `🎨 Variante disponible: *${colors[0].name}*\n`;
   } else if (colors.length > 1) {
@@ -265,12 +270,13 @@ async function initCatalog() {
     lucide.createIcons();
   }
 
-  // Abrir automaticamente si viene con parametro ?p=ID
+  // Abrir automaticamente si viene con parametro ?p=ID (y opcionalmente &img=ID_FOTO)
   const urlParams = new URLSearchParams(location.search);
   const prodId = urlParams.get('p');
+  const imgIdParam = urlParams.get('img');
   if (prodId && Array.isArray(appData.products)) {
     const found = appData.products.find(x => String(x.id) === prodId);
-    if (found) openProductModal(found.id);
+    if (found) openProductModal(found.id, imgIdParam ? Number(imgIdParam) : null);
   }
 }
 
@@ -513,7 +519,7 @@ function resetAllFilters() {
   if (firstC) setCategoryFilter("", firstC);
 }
 
-function openProductModal(id) {
+function openProductModal(id, initialImageId = null) {
   const p = (appData.products || []).find(item => item.id === id);
   if (!p) return;
 
@@ -522,7 +528,8 @@ function openProductModal(id) {
   const price = getEffectivePrice(p);
 
   const images = p.images || (p.image_ids ? p.image_ids.map(imgId => ({ id: imgId })) : []);
-  currentActiveImageId = images.length ? images[0].id : null;
+  const hasInitial = initialImageId && images.some(img => Number(img.id) === Number(initialImageId));
+  currentActiveImageId = hasInitial ? Number(initialImageId) : (images.length ? images[0].id : null);
   updateModalImageDisplay();
 
   renderModalThumbnails(images);
