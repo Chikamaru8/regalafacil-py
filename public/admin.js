@@ -94,6 +94,12 @@ function isSellerSession() {
   return state.data?.session?.role === 'seller';
 }
 
+function getMySellerRecord() {
+  if (!isSellerSession()) return null;
+  const myId = Number(state.data?.session?.sellerId);
+  return (state.data?.sellers || []).find((s) => Number(s.id) === myId) || state.data?.sellers?.[0] || null;
+}
+
 function getSellerBannersGrid() {
   let grid = $('#sellerTopBanners');
   if (!isSellerSession()) {
@@ -407,6 +413,10 @@ function applyRoleUi() {
   const sellerFilter = $('#leadSellerFilter');
   if (sellerFilter) sellerFilter.hidden = isSeller;
 
+  // Para vendedores ocultamos por completo el selector de tienda para simplificar la carga
+  const ownerRow = $('#prodOwnerRow');
+  if (ownerRow) ownerRow.hidden = isSeller;
+
   const prodSellerSelect = $('#prodSeller');
   if (prodSellerSelect) prodSellerSelect.disabled = isSeller;
 
@@ -538,7 +548,19 @@ function visibleProducts() {
 function renderProducts(products = []) {
   const list = $('#productsList');
   if (!products.length) {
-    list.innerHTML = '<p class="muted">No se encontraron productos.</p>';
+    if (!adminTerm) {
+      list.innerHTML = `
+        <div class="empty-onboarding">
+          <div class="empty-onboarding-icon">🎁</div>
+          <h3>¡Subí tu primer producto en segundos!</h3>
+          <p>Solo necesitás una foto, el nombre y el precio. Tus clientes te van a escribir directo a tu WhatsApp.</p>
+          <button type="button" id="emptyAddProductBtn" class="btn btn-primary" style="margin-top:4px;">📸 Subir mi primer producto</button>
+        </div>
+      `;
+      $('#emptyAddProductBtn')?.addEventListener('click', () => openProductModal(null));
+    } else {
+      list.innerHTML = '<p class="muted">No se encontraron productos con esa búsqueda.</p>';
+    }
     return;
   }
 
@@ -903,9 +925,20 @@ function renderLeads() {
   });
 }
 
-/* ---------- Asistente de carga con IA (sin API paga) ---------- */
+/* ---------- Selector de modo (Carga rápida vs IA) y Asistente IA ---------- */
 let aiBatchItems = [];
 let aiBatchIndex = 0;
+
+function setProductModalMode(mode) {
+  const isAi = mode === 'ai';
+  const aiSec = $('#aiModeSection');
+  if (aiSec) aiSec.hidden = !isAi;
+  $('#tabModeManual')?.classList.toggle('active', !isAi);
+  $('#tabModeAi')?.classList.toggle('active', isAi);
+}
+
+$('#tabModeManual')?.addEventListener('click', () => setProductModalMode('manual'));
+$('#tabModeAi')?.addEventListener('click', () => setProductModalMode('ai'));
 
 function resetAiAssistantUi() {
   aiBatchItems = [];
@@ -914,6 +947,7 @@ function resetAiAssistantUi() {
   if ($('#aiJsonInput')) $('#aiJsonInput').value = '';
   if ($('#aiBatchNav')) $('#aiBatchNav').hidden = true;
   if ($('#aiHelperMsg')) $('#aiHelperMsg').textContent = '';
+  setProductModalMode('manual');
 }
 
 function buildAiPrompt(city, phone, sellerName) {
@@ -985,6 +1019,7 @@ function applyAiItemToForm(item) {
   }
   if (promoPrice > 0) {
     $('#prodOfferPrice').value = String(promoPrice);
+    if ($('#accOffer')) $('#accOffer').open = true;
   } else {
     $('#prodOfferPrice').value = '';
     $('#prodOfferEnds').value = '';
@@ -997,6 +1032,7 @@ function applyAiItemToForm(item) {
   if (item.descripcion) {
     const cleanDesc = String(item.descripcion).replace(/^\[Foto\s*#\d+\]\s*/i, '').trim();
     $('#prodDesc').value = cleanDesc.slice(0, 1000);
+    if (cleanDesc && $('#accDetails')) $('#accDetails').open = true;
   }
 
   const shortDetailInput = $('#prodShortDetail');
@@ -1014,8 +1050,8 @@ function applyAiItemToForm(item) {
   const helper = $('#aiHelperMsg');
   if (helper) {
     helper.textContent = item.requiere_revision
-      ? '⚠️ Revisá el precio o detalle antes de guardar.'
-      : '✅ Datos cargados desde la IA. Subí la foto y tocá Guardar.';
+      ? '⚠️ Revisá el precio o detalle abajo antes de guardar.'
+      : '✅ Datos rellenados abajo. Subí la foto en el Paso 1 y tocá Guardar.';
   }
 }
 
@@ -1038,9 +1074,9 @@ function setupAiAssistantControls() {
     genBtn.dataset.listener = 'true';
     genBtn.addEventListener('click', async () => {
       const sellerSelect = $('#prodSeller');
-      const selectedSeller = sellerSelect?.value
-        ? (state.data?.sellers || []).find((s) => String(s.id) === String(sellerSelect.value))
-        : null;
+      const selectedSeller = isSellerSession()
+        ? getMySellerRecord()
+        : (sellerSelect?.value ? (state.data?.sellers || []).find((s) => String(s.id) === String(sellerSelect.value)) : null);
 
       let city = String($('#prodCity')?.value || selectedSeller?.city || '').trim();
       if (!city) {
@@ -1048,7 +1084,7 @@ function setupAiAssistantControls() {
         if (askedCity === null) return;
         city = askedCity.trim();
         if (!city) {
-          alert('Necesitás ingresar una ciudad para armar el prompt.');
+          alert('Necesitás ingresar una ciudad para armar las instrucciones.');
           return;
         }
         if ($('#prodCity')) $('#prodCity').value = city;
@@ -1061,7 +1097,7 @@ function setupAiAssistantControls() {
         if (askedPhone === null) return;
         phone = askedPhone.trim();
         if (!phone) {
-          alert('Necesitás ingresar un teléfono para armar el prompt.');
+          alert('Necesitás ingresar un teléfono para armar las instrucciones.');
           return;
         }
       }
@@ -1071,12 +1107,12 @@ function setupAiAssistantControls() {
 
       try {
         await navigator.clipboard.writeText(promptText);
-        $('#aiHelperMsg').textContent = '✅ ¡Prompt copiado! Ahora tocá "Abrir Gemini" o "Abrir ChatGPT", pegalo y subí tus fotos.';
+        $('#aiHelperMsg').textContent = '✅ ¡Instrucciones copiadas! Ahora abrí Gemini o ChatGPT, pegá el texto y subí tus fotos.';
       } catch {
         if ($('#aiPromptBox')) $('#aiPromptBox').hidden = false;
         $('#aiPromptOutput')?.select();
         document.execCommand('copy');
-        $('#aiHelperMsg').textContent = '✅ Prompt listo y seleccionado. Pegalo en Gemini o ChatGPT junto con tus fotos.';
+        $('#aiHelperMsg').textContent = '✅ Instrucciones listas. Pegalas en Gemini o ChatGPT junto con tus fotos.';
       }
     });
   }
@@ -1091,6 +1127,7 @@ function setupAiAssistantControls() {
         aiBatchIndex = 0;
         updateAiBatchNav();
         applyAiItemToForm(aiBatchItems[0]);
+        if (items.length === 1) setProductModalMode('manual');
       } catch (err) {
         $('#aiHelperMsg').textContent = `❌ ${err.message}`;
       }
@@ -1108,7 +1145,7 @@ function setupAiAssistantControls() {
         const sellerIdVal = isSellerSession()
           ? Number(state.data?.session?.sellerId)
           : ($('#prodSeller')?.value ? Number($('#prodSeller').value) : null);
-        const fallbackCity = String($('#prodCity')?.value || '').trim();
+        const fallbackCity = String($('#prodCity')?.value || getMySellerRecord()?.city || '').trim();
         let createdCount = 0;
 
         createAllBtn.disabled = true;
@@ -1164,7 +1201,7 @@ function setupAiAssistantControls() {
 
         await refreshBootstrap();
         $('#productModal').close();
-        alert(`Listo: se crearon ${createdCount} productos. Ahora entrá a Editar en cada uno para subir su foto y revisar.`);
+        alert(`Listo: se crearon ${createdCount} productos. Ahora entrá a Editar en cada uno para subir su foto.`);
       } catch (err) {
         $('#aiHelperMsg').textContent = `❌ ${err.message}`;
       } finally {
@@ -1295,6 +1332,7 @@ function renderImagesSection() {
 
 function renderMainPreview() {
   const box = $('#prodImagePreview');
+  const dropLabel = $('#photoDropLabel');
   if (!box) return;
 
   if (mainPreviewUrl) {
@@ -1307,24 +1345,32 @@ function renderMainPreview() {
   if (state.selectedFile) {
     mainPreviewUrl = URL.createObjectURL(state.selectedFile);
     src = mainPreviewUrl;
-    note = 'Foto nueva pendiente de guardar.';
+    note = '✅ Foto lista para publicar.';
   } else if (mainPhotoId) {
     src = imgUrl(mainPhotoId);
   }
 
   if (!src) {
-    box.innerHTML = '<p class="muted" style="font-size:12px;">Sin foto principal seleccionada.</p>';
+    if (dropLabel) dropLabel.style.display = 'flex';
+    box.innerHTML = '';
     return;
   }
 
+  if (dropLabel) dropLabel.style.display = 'none';
   box.innerHTML = `
-    <div style="position:relative; display:inline-block; border:1px solid #cbd5e1; border-radius:8px; padding:4px; background:#fff;">
-      <img src="${src}" alt="Foto principal" style="width:90px; height:90px; object-fit:cover; border-radius:6px; display:block;" />
-      <button type="button" id="removeMainPhotoBtn" aria-label="Quitar foto principal" style="position:absolute; top:2px; right:2px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.25);">✕</button>
+    <div style="display:flex;align-items:center;gap:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;">
+      <img src="${src}" alt="Foto principal" style="width:84px;height:84px;object-fit:cover;border-radius:10px;display:block;flex-shrink:0;" />
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+        <span style="font-size:13px;font-weight:700;color:#0f172a;">Foto de portada cargada</span>
+        ${note ? `<small style="color:#15803d;font-weight:600;font-size:12px;">${note}</small>` : ''}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <label for="prodImageFile" class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;background:#fff;border:1px solid #cbd5e1;">Cambiar foto</label>
+          <button type="button" id="removeMainPhotoBtn" class="btn btn-danger btn-sm">Quitar</button>
+        </div>
+      </div>
     </div>
-    ${note ? `<small class="muted" style="display:block; margin-top:4px;">${note}</small>` : ''}
   `;
-  $('#removeMainPhotoBtn').addEventListener('click', removeMainPhoto);
+  $('#removeMainPhotoBtn')?.addEventListener('click', removeMainPhoto);
 }
 
 async function removeMainPhoto() {
@@ -1355,7 +1401,7 @@ function renderGallery() {
   if (!container) return;
 
   if (!galleryImagesList.length) {
-    container.innerHTML = '<p class="muted" style="font-size:12px;">No hay fotos adicionales en la galería.</p>';
+    container.innerHTML = '<p class="muted" style="font-size:12px;margin:0;">Podés sumar más ángulos una vez guardado el producto.</p>';
     return;
   }
 
@@ -1427,7 +1473,7 @@ if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
 
     const prodId = Number($('#prodId').value);
     if (!prodId) {
-      alert('Primero debés guardar el producto antes de agregarle más fotos.');
+      alert('Primero tocá "Guardar y publicar" y después entrá a Editar para sumarle fotos extra.');
       e.target.value = '';
       return;
     }
@@ -1459,7 +1505,7 @@ function renderVariantsForm(variants = productVariants) {
   if (!container) return;
 
   if (!variants.length) {
-    container.innerHTML = '<p class="muted" style="font-size:12px;">Sin variantes de color añadidas.</p>';
+    container.innerHTML = '<p class="muted" style="font-size:12px;margin:0;">Sin variantes de color añadidas.</p>';
     return;
   }
 
@@ -1517,6 +1563,9 @@ function openProductModal(prod = null) {
   $('#productFormError').hidden = true;
   resetAiAssistantUi();
 
+  const ownerRow = $('#prodOwnerRow');
+  if (ownerRow) ownerRow.hidden = isSellerSession();
+
   let variants = [];
   try {
     const raw = prod && prod.colors ? (typeof prod.colors === 'string' ? JSON.parse(prod.colors) : prod.colors) : [];
@@ -1540,8 +1589,9 @@ function openProductModal(prod = null) {
     $('#prodId').value = prod.id;
     $('#prodName').value = prod.name || '';
     $('#prodPrice').value = dots(prod.price_gs);
-    $('#prodOfferPrice').value = offerActive(prod) ? prod.offer_price_gs : '';
-    $('#prodOfferEnds').value = offerActive(prod) ? toLocalInput(prod.offer_ends_at) : '';
+    const hasOffer = offerActive(prod);
+    $('#prodOfferPrice').value = hasOffer ? prod.offer_price_gs : '';
+    $('#prodOfferEnds').value = hasOffer ? toLocalInput(prod.offer_ends_at) : '';
     $('#prodCategory').value = prod.category_id || '';
     $('#prodStatus').value = prod.status || 'active';
     const sellerSelect = $('#prodSeller');
@@ -1551,7 +1601,7 @@ function openProductModal(prod = null) {
         : (prod.seller_id || prod.attributes?.seller_id ? String(prod.seller_id || prod.attributes.seller_id) : '');
     }
     const cityInput = $('#prodCity');
-    if (cityInput) cityInput.value = prod.attributes?.city || '';
+    if (cityInput) cityInput.value = prod.attributes?.city || getMySellerRecord()?.city || '';
     $('#prodDesc').value = prod.description || '';
     const shortDetailInput = $('#prodShortDetail');
     if (shortDetailInput) shortDetailInput.value = prod.attributes?.short_detail || '';
@@ -1561,6 +1611,11 @@ function openProductModal(prod = null) {
     $('#prodTags').querySelectorAll('input[type="checkbox"]').forEach((cb) => {
       cb.checked = selectedTags.has(Number(cb.value));
     });
+
+    // Abrir automáticamente los acordeones que ya tengan datos cargados
+    if ($('#accOffer')) $('#accOffer').open = hasOffer;
+    if ($('#accDetails')) $('#accDetails').open = Boolean(prod.description || selectedTags.size > 0);
+    if ($('#accGallery')) $('#accGallery').open = Boolean(galleryImagesList.length > 0 || productVariants.length > 0);
   } else {
     $('#productModalTitle').textContent = 'Nuevo producto';
     $('#productForm').reset();
@@ -1571,7 +1626,7 @@ function openProductModal(prod = null) {
       sellerSelect.value = isSellerSession() ? String(state.data.session.sellerId) : '';
     }
     const cityInput = $('#prodCity');
-    if (cityInput) cityInput.value = '';
+    if (cityInput) cityInput.value = isSellerSession() ? (getMySellerRecord()?.city || '') : '';
     const shortDetailInput = $('#prodShortDetail');
     if (shortDetailInput) shortDetailInput.value = '';
     mainPhotoId = null;
@@ -1579,6 +1634,11 @@ function openProductModal(prod = null) {
     productVariants = [];
     renderImagesSection();
     $('#deleteProductBtn').hidden = true;
+
+    // En producto nuevo cerramos todos los acordeones opcionales para una vista limpia
+    if ($('#accOffer')) $('#accOffer').open = false;
+    if ($('#accDetails')) $('#accDetails').open = false;
+    if ($('#accGallery')) $('#accGallery').open = false;
   }
 
   $('#productModal').showModal();
@@ -1724,7 +1784,7 @@ $('#productForm').addEventListener('submit', async (e) => {
     const idVal = Number($('#prodId').value);
 
     const price = digitsToInt($('#prodPrice').value);
-    if (!(price > 0)) throw new Error('Ingresá el precio normal.');
+    if (!(price > 0)) throw new Error('Ingresá el precio del producto.');
 
     const offerPrice = digitsToInt($('#prodOfferPrice').value);
     let offerEnds = null;
@@ -1732,7 +1792,7 @@ $('#productForm').addEventListener('submit', async (e) => {
     if (offerPrice > 0) {
       if (offerPrice >= price) throw new Error('El precio de oferta debe ser menor al precio normal.');
       const endsVal = $('#prodOfferEnds').value;
-      if (!endsVal) throw new Error('Indicá hasta cuándo vale la oferta.');
+      if (!endsVal) throw new Error('Indicá hasta cuándo vale la oferta (dentro de la sección Oferta).');
       offerEnds = Math.floor(new Date(endsVal).getTime() / 1000);
       if (!(offerEnds > nowSec())) throw new Error('La fecha de fin de la oferta debe ser futura.');
     }
