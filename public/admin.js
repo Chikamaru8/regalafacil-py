@@ -122,14 +122,12 @@ function downloadSellerPromoImage(sellerName, shareUrl) {
   canvas.height = 1080;
   const ctx = canvas.getContext('2d');
 
-  // Fondo degradado marca RegaláFácil PY
   const grad = ctx.createLinearGradient(0, 0, 1080, 1080);
   grad.addColorStop(0, '#0f172a');
   grad.addColorStop(1, '#4c0519');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 1080, 1080);
 
-  // Tarjeta central sutil
   ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
   ctx.lineWidth = 3;
@@ -138,7 +136,6 @@ function downloadSellerPromoImage(sellerName, shareUrl) {
   ctx.fill();
   ctx.stroke();
 
-  // Insignia superior
   ctx.fillStyle = '#e11d48';
   ctx.beginPath();
   ctx.roundRect(320, 150, 440, 68, 34);
@@ -148,13 +145,11 @@ function downloadSellerPromoImage(sellerName, shareUrl) {
   ctx.textAlign = 'center';
   ctx.fillText('🎁 REGALÁFÁCIL PY', 540, 195);
 
-  // Nombre de la tienda
   ctx.fillStyle = '#ffffff';
   ctx.font = '800 64px sans-serif';
   const cleanName = String(sellerName || 'Mi Tienda').slice(0, 26);
   ctx.fillText(cleanName, 540, 360);
 
-  // Texto principal
   ctx.fillStyle = '#fda4af';
   ctx.font = 'bold 42px sans-serif';
   ctx.fillText('¡Mis productos ya están online!', 540, 460);
@@ -164,7 +159,6 @@ function downloadSellerPromoImage(sellerName, shareUrl) {
   ctx.fillText('Mirá el catálogo completo y hacé', 540, 560);
   ctx.fillText('tu pedido directo por WhatsApp', 540, 610);
 
-  // Caja del enlace abajo
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
   ctx.roundRect(120, 730, 840, 120, 28);
@@ -179,7 +173,6 @@ function downloadSellerPromoImage(sellerName, shareUrl) {
   const displayUrl = shareUrl.replace(/^https?:\/\//, '');
   ctx.fillText(displayUrl.slice(0, 44), 540, 822);
 
-  // Descargar PNG
   const a = document.createElement('a');
   a.download = `estado-regalafacil-${(sellerName || 'tienda').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`;
   a.href = canvas.toDataURL('image/png');
@@ -225,27 +218,21 @@ function renderSellerShareBanner() {
     </div>
   `;
 
-  const copyBtn = $('#copySellerLinkBtn');
-  if (copyBtn) {
-    copyBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(promoText);
-        copyBtn.textContent = '✅ ¡Texto y link copiados!';
-        setTimeout(() => { copyBtn.textContent = '📋 Copiar para estado'; }, 2200);
-      } catch {
-        prompt('Copiá este texto para tu estado:', promoText);
-      }
-    });
-  }
+  $('#copySellerLinkBtn')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(promoText);
+      $('#copySellerLinkBtn').textContent = '✅ ¡Texto y link copiados!';
+      setTimeout(() => { $('#copySellerLinkBtn').textContent = '📋 Copiar para estado'; }, 2200);
+    } catch {
+      prompt('Copiá este texto para tu estado:', promoText);
+    }
+  });
 
-  const imgBtn = $('#downloadPromoImgBtn');
-  if (imgBtn) {
-    imgBtn.addEventListener('click', () => {
-      downloadSellerPromoImage(sellerName, shareUrl);
-      imgBtn.textContent = '✅ ¡Imagen descargada!';
-      setTimeout(() => { imgBtn.textContent = '🖼️ Imagen para estado'; }, 2200);
-    });
-  }
+  $('#downloadPromoImgBtn')?.addEventListener('click', () => {
+    downloadSellerPromoImage(sellerName, shareUrl);
+    $('#downloadPromoImgBtn').textContent = '✅ ¡Imagen descargada!';
+    setTimeout(() => { $('#downloadPromoImgBtn').textContent = '🖼️ Imagen para estado'; }, 2200);
+  });
 }
 
 function renderSellerPlanBanner() {
@@ -328,20 +315,17 @@ function renderSellerPlanBanner() {
     </div>
   `;
 
-  const openBtn = $('#openPaymentModalBtn');
-  if (openBtn) {
-    openBtn.addEventListener('click', () => {
-      $('#payMsg').hidden = true;
-      $('#payError').hidden = true;
-      $('#payReceiptFile').value = '';
-      $('#payReceiptFile').disabled = true;
-      $('#submitPaymentBtn').disabled = true;
-      $('#payUploadBox').style.opacity = '.6';
-      $('#payUploadHint').innerHTML = 'Tocá <strong>Copiar alias</strong> arriba para habilitar la carga del comprobante.';
-      $('#copyAliasBtn').textContent = '📋 Copiar alias';
-      $('#paymentModal')?.showModal();
-    });
-  }
+  $('#openPaymentModalBtn')?.addEventListener('click', () => {
+    $('#payMsg').hidden = true;
+    $('#payError').hidden = true;
+    $('#payReceiptFile').value = '';
+    $('#payReceiptFile').disabled = true;
+    $('#submitPaymentBtn').disabled = true;
+    $('#payUploadBox').style.opacity = '.6';
+    $('#payUploadHint').innerHTML = 'Tocá <strong>Copiar alias</strong> arriba para habilitar la carga del comprobante.';
+    $('#copyAliasBtn').textContent = '📋 Copiar alias';
+    $('#paymentModal')?.showModal();
+  });
 }
 
 $('#closePaymentBtn')?.addEventListener('click', () => $('#paymentModal')?.close());
@@ -413,7 +397,6 @@ function applyRoleUi() {
   const sellerFilter = $('#leadSellerFilter');
   if (sellerFilter) sellerFilter.hidden = isSeller;
 
-  // Para vendedores ocultamos por completo el selector de tienda para simplificar la carga
   const ownerRow = $('#prodOwnerRow');
   if (ownerRow) ownerRow.hidden = isSeller;
 
@@ -553,7 +536,7 @@ function renderProducts(products = []) {
         <div class="empty-onboarding">
           <div class="empty-onboarding-icon">🎁</div>
           <h3>¡Subí tu primer producto en segundos!</h3>
-          <p>Solo necesitás una foto, el nombre y el precio. Tus clientes te van a escribir directo a tu WhatsApp.</p>
+          <p>Subí una o varias fotos, elegí la categoría, público y precio. Tus clientes te van a escribir directo a tu WhatsApp.</p>
           <button type="button" id="emptyAddProductBtn" class="btn btn-primary" style="margin-top:4px;">📸 Subir mi primer producto</button>
         </div>
       `;
@@ -925,7 +908,7 @@ function renderLeads() {
   });
 }
 
-/* ---------- Selector de modo (Carga rápida vs IA) y Asistente IA ---------- */
+/* ---------- Selector de modo (Carga directa vs IA) y Asistente IA ---------- */
 let aiBatchItems = [];
 let aiBatchIndex = 0;
 
@@ -1032,7 +1015,6 @@ function applyAiItemToForm(item) {
   if (item.descripcion) {
     const cleanDesc = String(item.descripcion).replace(/^\[Foto\s*#\d+\]\s*/i, '').trim();
     $('#prodDesc').value = cleanDesc.slice(0, 1000);
-    if (cleanDesc && $('#accDetails')) $('#accDetails').open = true;
   }
 
   const shortDetailInput = $('#prodShortDetail');
@@ -1051,7 +1033,7 @@ function applyAiItemToForm(item) {
   if (helper) {
     helper.textContent = item.requiere_revision
       ? '⚠️ Revisá el precio o detalle abajo antes de guardar.'
-      : '✅ Datos rellenados abajo. Subí la foto en el Paso 1 y tocá Guardar.';
+      : '✅ Datos rellenados abajo. Subí tus fotos en el Paso 1 y tocá Guardar.';
   }
 }
 
@@ -1233,7 +1215,7 @@ function setupAiAssistantControls() {
   }
 }
 
-/* ---------- Formulario de producto ---------- */
+/* ---------- Formulario de producto (Categorías y Etiquetas agrupadas) ---------- */
 const AGE_RANGE_LABELS = {
   'niño/a': 'Niño/a (0–11 años)',
   'nino/a': 'Niño/a (0–11 años)',
@@ -1247,18 +1229,63 @@ function formatTagLabel(rawLabel) {
   return AGE_RANGE_LABELS[clean.toLowerCase()] || clean;
 }
 
+function classifyTagGroup(tag) {
+  const gk = String(tag.group_key || '').toLowerCase();
+  const lbl = String(tag.label || '').toLowerCase();
+  if (gk === 'age' || lbl.includes('niño') || lbl.includes('nino') || lbl.includes('joven') || lbl.includes('adulto')) {
+    return 'age';
+  }
+  if (gk === 'occasion' || lbl.includes('cumple') || lbl.includes('navidad') || lbl.includes('aniversario') || lbl.includes('valent')) {
+    return 'occasion';
+  }
+  return 'recipient';
+}
+
 function populateFormOptions() {
   const cats = state.data?.categories || [];
-  $('#prodCategory').innerHTML = `<option value="">Sin categoría</option>` +
+  $('#prodCategory').innerHTML = `<option value="">Seleccionar categoría...</option>` +
     cats.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 
   const tags = state.data?.tags || [];
-  $('#prodTags').innerHTML = tags.map((t) => `
+  const groups = { recipient: [], age: [], occasion: [] };
+  for (const t of tags) {
+    groups[classifyTagGroup(t)].push(t);
+  }
+
+  const renderChips = (arr) => arr.map((t) => `
     <label class="chip-check" style="white-space:nowrap;">
       <input type="checkbox" value="${t.id}" />
       <span>${escapeHtml(formatTagLabel(t.label))}</span>
     </label>
   `).join('');
+
+  const sections = [];
+  if (groups.recipient.length) {
+    sections.push(`
+      <div class="tag-group-box">
+        <p class="tag-group-title">👤 ¿Para quién? (Hombre / Mujer / Relación)</p>
+        <div class="chips-wrap">${renderChips(groups.recipient)}</div>
+      </div>
+    `);
+  }
+  if (groups.age.length) {
+    sections.push(`
+      <div class="tag-group-box">
+        <p class="tag-group-title">🎂 Rango de edad</p>
+        <div class="chips-wrap">${renderChips(groups.age)}</div>
+      </div>
+    `);
+  }
+  if (groups.occasion.length) {
+    sections.push(`
+      <div class="tag-group-box">
+        <p class="tag-group-title">🎉 Ocasión especial</p>
+        <div class="chips-wrap">${renderChips(groups.occasion)}</div>
+      </div>
+    `);
+  }
+
+  $('#prodTags').innerHTML = sections.join('');
 
   const sellerSelect = $('#prodSeller');
   if (sellerSelect) {
@@ -1302,16 +1329,25 @@ function populateFormOptions() {
   setupAiAssistantControls();
 }
 
+/* ---------- Gestión completa de Fotos (Portada + Galería ordenable desde nuevo o edición) + Colores ---------- */
 let productVariants = [];
 let mainPhotoId = null;
-let galleryImagesList = [];
+let galleryItems = [];
 let mainPreviewUrl = null;
+
+function clearPendingGalleryUrls() {
+  for (const item of galleryItems) {
+    if (item.type === 'pending' && item.previewUrl) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
+  }
+}
 
 function syncVariantsWithImages() {
   const validIds = new Set();
   if (mainPhotoId) validIds.add(Number(mainPhotoId));
-  for (const id of galleryImagesList) {
-    if (id) validIds.add(Number(id));
+  for (const item of galleryItems) {
+    if (item.type === 'saved' && item.id) validIds.add(Number(item.id));
   }
 
   let changed = false;
@@ -1345,7 +1381,7 @@ function renderMainPreview() {
   if (state.selectedFile) {
     mainPreviewUrl = URL.createObjectURL(state.selectedFile);
     src = mainPreviewUrl;
-    note = '✅ Foto lista para publicar.';
+    note = '✅ Foto principal lista.';
   } else if (mainPhotoId) {
     src = imgUrl(mainPhotoId);
   }
@@ -1359,12 +1395,12 @@ function renderMainPreview() {
   if (dropLabel) dropLabel.style.display = 'none';
   box.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;">
-      <img src="${src}" alt="Foto principal" style="width:84px;height:84px;object-fit:cover;border-radius:10px;display:block;flex-shrink:0;" />
+      <img src="${src}" alt="Foto principal" style="width:86px;height:86px;object-fit:cover;border-radius:10px;display:block;flex-shrink:0;" />
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
-        <span style="font-size:13px;font-weight:700;color:#0f172a;">Foto de portada cargada</span>
+        <span style="font-size:13px;font-weight:700;color:#0f172a;">⭐ Foto de portada</span>
         ${note ? `<small style="color:#15803d;font-weight:600;font-size:12px;">${note}</small>` : ''}
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <label for="prodImageFile" class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;background:#fff;border:1px solid #cbd5e1;">Cambiar foto</label>
+          <label for="prodImageFile" class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;background:#fff;border:1px solid #cbd5e1;">Cambiar portada</label>
           <button type="button" id="removeMainPhotoBtn" class="btn btn-danger btn-sm">Quitar</button>
         </div>
       </div>
@@ -1400,24 +1436,53 @@ function renderGallery() {
   const container = $('#productImagesGallery');
   if (!container) return;
 
-  if (!galleryImagesList.length) {
-    container.innerHTML = '<p class="muted" style="font-size:12px;margin:0;">Podés sumar más ángulos una vez guardado el producto.</p>';
+  if (!galleryItems.length) {
+    container.innerHTML = '<p class="muted" style="font-size:12px;margin:0;">Aún no agregaste fotos adicionales.</p>';
     return;
   }
 
   container.innerHTML = `
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;" id="dragGalleryContainer">
-      ${galleryImagesList.map((id, idx) => `
-        <div draggable="true" data-index="${idx}" class="draggable-thumb" style="position:relative; width:85px; height:95px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#f8fafc; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
-          <button type="button" onclick="deleteGalleryImage(${id})" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
-          <img src="${imgUrl(id)}" alt="" style="width:100%; height:65px; object-fit:cover; border-radius:4px; pointer-events:none;" />
-          <span style="font-size:11px; color:#475569; font-weight:600;">Foto #${idx + 1}</span>
-        </div>
-      `).join('')}
+      ${galleryItems.map((item, idx) => {
+        const thumbSrc = item.type === 'saved' ? imgUrl(item.id) : item.previewUrl;
+        return `
+          <div draggable="true" data-index="${idx}" class="draggable-thumb" style="position:relative; width:88px; height:102px; border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; background:#fff; padding:4px; text-align:center; cursor:grab; display:flex; flex-direction:column; justify-content:space-between; align-items:center;">
+            <button type="button" data-remove-gal-idx="${idx}" aria-label="Eliminar foto" style="position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2);">✕</button>
+            <img src="${thumbSrc}" alt="" style="width:100%; height:68px; object-fit:cover; border-radius:6px; pointer-events:none;" />
+            <span style="font-size:11px; color:#475569; font-weight:600;">Foto #${idx + 1}</span>
+          </div>
+        `;
+      }).join('')}
     </div>
-    <small class="muted" style="display:block; margin-top:8px;">💡 Arrastrá las fotos adicionales para reordenarlas.</small>
+    <small class="muted" style="display:block; margin-top:8px;">💡 Arrastrá las fotos adicionales para cambiar su orden.</small>
   `;
+
+  container.querySelectorAll('[data-remove-gal-idx]').forEach((btn) => {
+    btn.addEventListener('click', () => removeGalleryItemAt(Number(btn.dataset.removeGalIdx)));
+  });
+
   setupDragAndDrop();
+}
+
+async function removeGalleryItemAt(index) {
+  const item = galleryItems[index];
+  if (!item) return;
+
+  if (item.type === 'saved') {
+    if (!confirm('¿Eliminar esta foto de la galería?')) return;
+    try {
+      await api(`/api/admin/image?id=${item.id}`, { method: 'DELETE' });
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+  } else if (item.previewUrl) {
+    URL.revokeObjectURL(item.previewUrl);
+  }
+
+  galleryItems.splice(index, 1);
+  syncVariantsWithImages();
+  renderImagesSection();
 }
 
 function setupDragAndDrop() {
@@ -1441,28 +1506,14 @@ function setupDragAndDrop() {
       e.preventDefault();
       const targetIndex = Number(item.dataset.index);
       if (draggedIndex !== null && draggedIndex !== targetIndex) {
-        const moved = galleryImagesList.splice(draggedIndex, 1)[0];
-        galleryImagesList.splice(targetIndex, 0, moved);
+        const moved = galleryItems.splice(draggedIndex, 1)[0];
+        galleryItems.splice(targetIndex, 0, moved);
         draggedIndex = null;
         renderImagesSection();
       }
     });
   });
 }
-
-window.deleteGalleryImage = async function (imageId) {
-  if (!confirm('¿Eliminar esta foto de la galería?')) return;
-  try {
-    await api(`/api/admin/image?id=${imageId}`, { method: 'DELETE' });
-  } catch (err) {
-    alert(err.message);
-    return;
-  }
-
-  galleryImagesList = galleryImagesList.filter((id) => Number(id) !== Number(imageId));
-  syncVariantsWithImages();
-  renderImagesSection();
-};
 
 const addMoreImagesBtn = $('#addMoreImagesBtn');
 if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
@@ -1471,25 +1522,33 @@ if (addMoreImagesBtn && !addMoreImagesBtn.dataset.listener) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    const prodId = Number($('#prodId').value);
-    if (!prodId) {
-      alert('Primero tocá "Guardar y publicar" y después entrá a Editar para sumarle fotos extra.');
+    const remainingSlots = Math.max(0, 7 - galleryItems.length);
+    if (remainingSlots <= 0) {
+      alert('Ya alcanzaste el máximo de 7 fotos adicionales en la galería.');
       e.target.value = '';
       return;
     }
 
-    for (const file of files) {
+    const toProcess = files.slice(0, remainingSlots);
+    const prodId = Number($('#prodId').value);
+
+    for (const file of toProcess) {
       try {
         const compressed = await compressImageFile(file);
-        const fd = new FormData();
-        fd.append('product_id', String(prodId));
-        fd.append('file', compressed, 'photo');
-        const res = await api('/api/admin/image', { method: 'POST', body: fd });
-        if (res && res.id) {
-          galleryImagesList.push(res.id);
+        if (prodId) {
+          const fd = new FormData();
+          fd.append('product_id', String(prodId));
+          fd.append('file', compressed, 'photo');
+          const res = await api('/api/admin/image', { method: 'POST', body: fd });
+          if (res && res.id) {
+            galleryItems.push({ type: 'saved', id: Number(res.id) });
+          }
+        } else {
+          const previewUrl = URL.createObjectURL(compressed);
+          galleryItems.push({ type: 'pending', blob: compressed, previewUrl });
         }
       } catch (err) {
-        alert(`No se pudo subir una de las fotos: ${err.message}`);
+        alert(`No se pudo procesar una de las fotos: ${err.message}`);
       }
     }
 
@@ -1505,19 +1564,21 @@ function renderVariantsForm(variants = productVariants) {
   if (!container) return;
 
   if (!variants.length) {
-    container.innerHTML = '<p class="muted" style="font-size:12px;margin:0;">Sin variantes de color añadidas.</p>';
+    container.innerHTML = '<p class="muted" style="font-size:12px;margin:0;">Sin variantes añadidas.</p>';
     return;
   }
 
+  const savedGallery = galleryItems.filter((it) => it.type === 'saved');
+
   container.innerHTML = variants.map((v, index) => `
-    <div style="display:flex; gap:6px; align-items:center; background:#f8fafc; padding:8px; border-radius:8px; border:1px solid #e2e8f0; flex-wrap:wrap;">
-      <input type="text" value="${escapeHtml(v.name || '')}" placeholder="Ej: Marrón, Rosa..." data-variant-name="${index}" style="flex:1; min-width:110px; padding:6px 8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;" />
+    <div style="display:flex; gap:6px; align-items:center; background:#fff; padding:8px; border-radius:8px; border:1px solid #e2e8f0; flex-wrap:wrap;">
+      <input type="text" value="${escapeHtml(v.name || '')}" placeholder="Ej: Negro, Rosa, Talle M..." data-variant-name="${index}" style="flex:1; min-width:120px; padding:6px 8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;" />
 
       <select data-variant-img="${index}" style="padding:6px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
         <option value="">📸 Foto por defecto</option>
         ${mainPhotoId ? `<option value="${mainPhotoId}" ${Number(v.image_id) === Number(mainPhotoId) ? 'selected' : ''}>⭐ Foto principal (Portada)</option>` : ''}
-        ${galleryImagesList.map((id, gIdx) => `
-          <option value="${id}" ${Number(v.image_id) === Number(id) ? 'selected' : ''}>Foto #${gIdx + 1}</option>
+        ${savedGallery.map((it, gIdx) => `
+          <option value="${it.id}" ${Number(v.image_id) === Number(it.id) ? 'selected' : ''}>Foto #${gIdx + 1}</option>
         `).join('')}
       </select>
 
@@ -1559,6 +1620,8 @@ if (addVariantBtn && !addVariantBtn.dataset.listener) {
 function openProductModal(prod = null) {
   state.editingProduct = prod;
   state.selectedFile = null;
+  clearPendingGalleryUrls();
+  galleryItems = [];
   $('#prodImageFile').value = '';
   $('#productFormError').hidden = true;
   resetAiAssistantUi();
@@ -1580,7 +1643,7 @@ function openProductModal(prod = null) {
 
   const ids = prod ? (prod.images ? prod.images.map((i) => i.id) : (prod.image_ids || [])) : [];
   mainPhotoId = ids.length > 0 ? ids[0] : null;
-  galleryImagesList = ids.slice(1);
+  galleryItems = ids.slice(1).map((id) => ({ type: 'saved', id: Number(id) }));
 
   renderImagesSection();
 
@@ -1612,10 +1675,7 @@ function openProductModal(prod = null) {
       cb.checked = selectedTags.has(Number(cb.value));
     });
 
-    // Abrir automáticamente los acordeones que ya tengan datos cargados
     if ($('#accOffer')) $('#accOffer').open = hasOffer;
-    if ($('#accDetails')) $('#accDetails').open = Boolean(prod.description || selectedTags.size > 0);
-    if ($('#accGallery')) $('#accGallery').open = Boolean(galleryImagesList.length > 0 || productVariants.length > 0);
   } else {
     $('#productModalTitle').textContent = 'Nuevo producto';
     $('#productForm').reset();
@@ -1629,16 +1689,13 @@ function openProductModal(prod = null) {
     if (cityInput) cityInput.value = isSellerSession() ? (getMySellerRecord()?.city || '') : '';
     const shortDetailInput = $('#prodShortDetail');
     if (shortDetailInput) shortDetailInput.value = '';
+    $('#prodTags').querySelectorAll('input[type="checkbox"]').forEach((cb) => { cb.checked = false; });
     mainPhotoId = null;
-    galleryImagesList = [];
+    galleryItems = [];
     productVariants = [];
     renderImagesSection();
     $('#deleteProductBtn').hidden = true;
-
-    // En producto nuevo cerramos todos los acordeones opcionales para una vista limpia
     if ($('#accOffer')) $('#accOffer').open = false;
-    if ($('#accDetails')) $('#accDetails').open = false;
-    if ($('#accGallery')) $('#accGallery').open = false;
   }
 
   $('#productModal').showModal();
@@ -1792,7 +1849,7 @@ $('#productForm').addEventListener('submit', async (e) => {
     if (offerPrice > 0) {
       if (offerPrice >= price) throw new Error('El precio de oferta debe ser menor al precio normal.');
       const endsVal = $('#prodOfferEnds').value;
-      if (!endsVal) throw new Error('Indicá hasta cuándo vale la oferta (dentro de la sección Oferta).');
+      if (!endsVal) throw new Error('Indicá hasta cuándo vale la oferta (dentro del Paso 4 Oferta).');
       offerEnds = Math.floor(new Date(endsVal).getTime() / 1000);
       if (!(offerEnds > nowSec())) throw new Error('La fecha de fin de la oferta debe ser futura.');
     }
@@ -1866,10 +1923,25 @@ $('#productForm').addEventListener('submit', async (e) => {
       }
     }
 
+    const finalGalleryIds = [];
+    for (const item of galleryItems) {
+      if (item.type === 'saved' && item.id) {
+        finalGalleryIds.push(Number(item.id));
+      } else if (item.type === 'pending' && item.blob && targetId) {
+        const fd = new FormData();
+        fd.append('product_id', String(targetId));
+        fd.append('file', item.blob, 'gallery-photo');
+        const resGal = await api('/api/admin/image', { method: 'POST', body: fd });
+        if (resGal && resGal.id) {
+          finalGalleryIds.push(Number(resGal.id));
+        }
+      }
+    }
+
     const finalImageIds = [];
     if (mainPhotoId) finalImageIds.push(Number(mainPhotoId));
-    for (const galId of galleryImagesList) {
-      if (galId) finalImageIds.push(Number(galId));
+    for (const galId of finalGalleryIds) {
+      if (galId && galId !== Number(mainPhotoId)) finalImageIds.push(Number(galId));
     }
 
     const payload = {
@@ -1895,6 +1967,8 @@ $('#productForm').addEventListener('submit', async (e) => {
     });
 
     state.selectedFile = null;
+    clearPendingGalleryUrls();
+    galleryItems = [];
     $('#prodImageFile').value = '';
     $('#productModal').close();
     await refreshBootstrap();

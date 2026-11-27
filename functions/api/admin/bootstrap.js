@@ -22,8 +22,9 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const DEFAULT_TAGS = [
-  { group_key: 'recipient', slug: 'hombre', label: 'Hombre' },
-  { group_key: 'recipient', slug: 'mujer', label: 'Mujer' },
+  { group_key: 'gender', slug: 'hombre', label: 'Hombre' },
+  { group_key: 'gender', slug: 'mujer', label: 'Mujer' },
+  { group_key: 'gender', slug: 'unisex', label: 'Unisex' },
   { group_key: 'recipient', slug: 'mama', label: 'Mamá' },
   { group_key: 'recipient', slug: 'papa', label: 'Papá' },
   { group_key: 'recipient', slug: 'pareja', label: 'Pareja' },
